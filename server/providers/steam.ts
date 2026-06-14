@@ -332,7 +332,7 @@ export async function getProgress(): Promise<Progress> {
 
   const ready = wishPending === 0 && reviewCached >= Math.min(REVIEW_GATE, games.length)
   return {
-    configured: true, ready, warming: (await countRemaining(now)) > 0,
+    configured: true, ready, warming: (await countStorefrontRemaining(now)) > 0,
     wishlist: { cached: wishCached, total: appids.length },
     library: { cached: reviewCached, total: games.length },
   }

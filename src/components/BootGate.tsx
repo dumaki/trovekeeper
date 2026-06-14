@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import ChestIcon from './ChestIcon'
+import LoadingScreen from './LoadingScreen'
 
 interface Progress {
   configured: boolean
@@ -38,6 +39,9 @@ export default function BootGate({ children }: { children: ReactNode }) {
   }, [])
 
   if (entered) return <>{children}</>
+  // Still checking readiness (e.g. a warm-cache refresh) — show the neutral
+  // loader, not the detailed splash, so quick refreshes don't flash progress bars.
+  if (!progress) return <LoadingScreen />
   return <Splash progress={progress} onSkip={() => setEntered(true)} />
 }
 

@@ -3,6 +3,7 @@ import * as mock from './mockData'
 import type {
   Game, WishlistItem, GameStatus, StoreKey,
 } from './mockData'
+import LoadingScreen from '../components/LoadingScreen'
 
 type Slice<K extends string> = { key: K; value: number; color: string }
 
@@ -51,7 +52,9 @@ async function getJson<T>(path: string): Promise<T> {
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<DataState>({ ...MOCK, source: 'loading' })
+  // null until the first fetch settles — we render a neutral loader rather than
+  // bundled mock, so stale numbers never flash before live data arrives.
+  const [state, setState] = useState<DataState | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -85,5 +88,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true }
   }, [])
 
+  if (!state) return <LoadingScreen />
   return <Ctx.Provider value={state}>{children}</Ctx.Provider>
 }

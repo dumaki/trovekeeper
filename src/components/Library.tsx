@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
-import { storeMeta, type GameStatus, type StoreKey } from '../data/mockData'
+import { storeMeta, type Game, type GameStatus, type StoreKey } from '../data/mockData'
 import { useData } from '../data/DataContext'
+import GameModal from './GameModal'
 
 const STATUS_TONE: Record<GameStatus, string> = {
   Backlog: '#ef4444', Playing: '#f5c518', Finished: '#22c55e', Next: '#38bdf8', Skip: '#64748b',
@@ -15,6 +16,7 @@ export default function Library() {
   const [store, setStore] = useState<StoreKey | 'All'>('All')
   const [status, setStatus] = useState<GameStatus | 'All'>('All')
   const [q, setQ] = useState('')
+  const [selected, setSelected] = useState<Game | null>(null)
 
   const games = useMemo(() => library.filter((g) =>
     (store === 'All' || g.store === store) &&
@@ -48,15 +50,17 @@ export default function Library() {
 
       <div className="game-grid">
         {games.map((g) => (
-          <article key={g.appid} className="game-card">
+          <article key={g.appid} className="game-card" onClick={() => setSelected(g)}>
             <div className="cover">
               <img src={g.headerImage} alt={g.name} loading="lazy"
                 onError={(e) => { (e.currentTarget.style.visibility = 'hidden') }} />
-              {/* status badge doubles as the editor — change it to re-tag the game */}
+              {/* status badge doubles as the editor — change it to re-tag the game.
+                  stopPropagation so changing status doesn't open the detail card. */}
               <select
                 className="status-badge status-select"
                 value={g.status}
                 style={{ background: STATUS_TONE[g.status] }}
+                onClick={(e) => e.stopPropagation()}
                 onChange={(e) => setGameStatus(g.appid, e.target.value as GameStatus)}
                 aria-label={`Status for ${g.name}`}
               >
@@ -88,6 +92,8 @@ export default function Library() {
         ))}
         {games.length === 0 && <p className="empty">No games match these filters.</p>}
       </div>
+
+      {selected && <GameModal game={selected} onClose={() => setSelected(null)} />}
     </div>
   )
 }

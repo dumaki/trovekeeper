@@ -125,6 +125,7 @@ async function fetchOwnedGames(): Promise<Game[]> {
       reviewPct: 0,
       reviewBand: 'Mostly Positive' as ReviewBand,
       headerImage: hdr(g.appid),
+      lastPlayed: g.rtime_last_played || 0,
     }))
     .sort((a, b) => b.playtimeHours - a.playtimeHours) // most-played first
 }
@@ -334,6 +335,86 @@ export async function getWishlist(): Promise<{
   }).length
   const pending = Math.max(0, appids.length - items.length - activeMisses)
   return { source: 'live', items, total: appids.length, pending }
+}
+
+// ---- Game detail (on-demand, for the Library detail card) -----------------
+export interface AchievementDetail {
+  apiname: string
+  name: string
+  description: string
+  hidden: boolean
+  icon: string       // unlocked (color) icon
+  iconGray: string   // locked (grey) icon
+  achieved: boolean
+  unlockedAt: number | null // unix seconds
+}
+export interface GameDetail {
+  appid: number
+  name: string
+  shortDescription: string
+  developers: string[]
+  publishers: string[]
+  releaseDate: string
+  genres: string[]
+  categories: string[]
+  headerImage: string
+  achievements: AchievementDetail[]
+}
+
+// Small in-memory cache so reopening a card doesn't refetch (10 min).
+const detailMem = new Map<number, { at: number; data: GameDetail }>()
+const DETAIL_TTL = 10 * 60_000
+
+export async function getGameDetail(appid: number): Promise<GameDetail> {
+  if (!Number.isFinite(appid)) throw new Error('invalid appid')
+  const cached = detailMem.get(appid)
+  if (cached && Date.now() - cached.at < DETAIL_TTL) return cached.data
+
+  // appdetails (storefront) + schema + player achievements (Web API) in parallel.
+  const [adJson, schema, player] = await Promise.all([
+    fetch(`https://store.steampowered.com/api/appdetails?appids=${appid}&cc=us&l=en`,
+      { signal: AbortSignal.timeout(12_000) }).then((r) => r.json()).catch(() => null) as Promise<any>,
+    configured()
+      ? steamGet('/ISteamUserStats/GetSchemaForGame/v2/', { appid: String(appid) }).catch(() => null)
+      : Promise.resolve(null),
+    configured()
+      ? steamGet('/ISteamUserStats/GetPlayerAchievements/v1/', { steamid: id()!, appid: String(appid) }).catch(() => null)
+      : Promise.resolve(null),
+  ])
+
+  const ad = adJson?.[String(appid)]?.data ?? {}
+  const defs: any[] = schema?.game?.availableGameStats?.achievements ?? []
+  const playerAch: any[] = player?.playerstats?.achievements ?? []
+  const byName = new Map(playerAch.map((a) => [a.apiname, a]))
+
+  const achievements: AchievementDetail[] = defs.map((d) => {
+    const p = byName.get(d.name)
+    return {
+      apiname: d.name,
+      name: d.displayName ?? d.name,
+      description: d.description ?? '',
+      hidden: d.hidden === 1,
+      icon: d.icon ?? '',
+      iconGray: d.icongray ?? '',
+      achieved: Boolean(p?.achieved),
+      unlockedAt: p?.unlocktime || null,
+    }
+  })
+
+  const detail: GameDetail = {
+    appid,
+    name: ad.name ?? `App ${appid}`,
+    shortDescription: ad.short_description ?? '',
+    developers: ad.developers ?? [],
+    publishers: ad.publishers ?? [],
+    releaseDate: ad.release_date?.date ?? '',
+    genres: (ad.genres ?? []).map((g: any) => g.description),
+    categories: (ad.categories ?? []).map((c: any) => c.description),
+    headerImage: ad.header_image ?? hdr(appid),
+    achievements,
+  }
+  detailMem.set(appid, { at: Date.now(), data: detail })
+  return detail
 }
 
 // ---- Boot progress --------------------------------------------------------

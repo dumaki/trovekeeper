@@ -26,6 +26,7 @@ export interface Game {
   achUnlocked?: number   // Steam achievements unlocked (undefined = not yet fetched)
   achTotal?: number      // total achievements (0 = game has none)
   ttbHours?: number      // IGDB main-story time-to-beat, hours (undefined = unknown)
+  lastPlayed?: number    // unix seconds of last session (0/undefined = never)
 }
 
 export interface WishlistItem {

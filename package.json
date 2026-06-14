@@ -10,6 +10,7 @@
     "gog-login": "node scripts/gog-login.mjs",
     "epic-login": "node scripts/epic-login.mjs",
     "psn-login": "node scripts/psn-login.mjs",
+    "xbox-login": "node scripts/xbox-login.mjs",
     "dev": "concurrently -k -n web,api -c cyan,green \"vite\" \"npm run server\"",
     "web": "vite",
     "server": "tsx watch server/index.ts",

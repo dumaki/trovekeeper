@@ -36,6 +36,7 @@ export default function Dashboard() {
   const gogGames = library.filter((g) => g.store === 'GOG').length
   const epicGames = library.filter((g) => g.store === 'Epic').length
   const psnGames = library.filter((g) => g.store === 'PSN').length
+  const xboxGames = library.filter((g) => g.store === 'Xbox').length
   const playedCount = library.filter((g) => g.playtimeHours > 0).length
   const playedPct = pct(playedCount)
   const T = total.toLocaleString()
@@ -81,6 +82,7 @@ export default function Dashboard() {
     ...(gogGames > 0 ? [{ badge: 'G', tone: '#7b3ff2', label: `GOG ${gogGames.toLocaleString()}`, sub: 'games' }] : []),
     ...(epicGames > 0 ? [{ badge: 'E', tone: '#c9d1da', label: `Epic ${epicGames.toLocaleString()}`, sub: 'games' }] : []),
     ...(psnGames > 0 ? [{ badge: 'P', tone: '#2f6bd8', label: `PSN ${psnGames.toLocaleString()}`, sub: 'games' }] : []),
+    ...(xboxGames > 0 ? [{ badge: 'X', tone: '#16a34a', label: `Xbox ${xboxGames.toLocaleString()}`, sub: 'games' }] : []),
   ]
 
   const [t, setT] = useState(0)

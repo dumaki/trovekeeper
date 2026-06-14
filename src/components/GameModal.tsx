@@ -106,8 +106,12 @@ export default function GameModal({ game, onClose }: { game: Game; onClose: () =
                   const masked = a.hidden && !a.achieved
                   return (
                     <div key={a.apiname} className={`ach-item ${a.achieved ? 'on' : 'off'}`}>
-                      <img className="ach-icon" src={a.achieved ? a.icon : a.iconGray} alt=""
-                        loading="lazy" onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} />
+                      {(a.achieved ? a.icon : a.iconGray) ? (
+                        <img className="ach-icon" src={a.achieved ? a.icon : a.iconGray} alt=""
+                          loading="lazy" onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} />
+                      ) : (
+                        <div className="ach-icon ach-icon-blank" />
+                      )}
                       <div className="ach-body">
                         <div className="ach-name">{masked ? 'Hidden achievement' : a.name}</div>
                         <div className="ach-desc">{masked ? 'Unlock to reveal' : a.description}</div>

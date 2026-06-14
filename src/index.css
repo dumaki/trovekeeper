@@ -450,6 +450,8 @@ b { font-weight: 700; color: var(--text); }
 }
 .ach-item.off { opacity: 0.55; }
 .ach-icon { width: 40px; height: 40px; border-radius: 7px; flex-shrink: 0; background: var(--panel); }
+/* Placeholder for achievements with no icon URL (e.g. Xbox 360 trophies). */
+.ach-icon-blank { background: var(--panel-2); border: 1px solid var(--border); }
 .ach-body { flex: 1; min-width: 0; }
 .ach-name { font-size: 13.5px; font-weight: 700; color: var(--text); }
 .ach-desc { font-size: 12.5px; color: var(--muted); margin-top: 2px; }

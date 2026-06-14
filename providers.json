@@ -56,6 +56,18 @@
       ]
     },
     {
+      "id": "xbox",
+      "label": "Xbox",
+      "env": [
+        {
+          "key": "XBOX_REFRESH_TOKEN",
+          "required": true,
+          "secret": true,
+          "hint": "run `npm run xbox-login` to obtain this — don't enter it by hand"
+        }
+      ]
+    },
+    {
       "id": "igdb",
       "label": "IGDB (time-to-beat, optional)",
       "env": [

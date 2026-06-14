@@ -22,6 +22,7 @@ npm run whoami    # resolve your SteamID64 from a vanity name
 npm run gog-login # one-time GOG OAuth: writes GOG_REFRESH_TOKEN to .env
 npm run epic-login # one-time Epic OAuth: writes EPIC_REFRESH_TOKEN to .env
 npm run psn-login # one-time PSN: writes PSN_NPSSO (npsso cookie) to .env
+npm run xbox-login # one-time Xbox: Microsoft OAuth -> XBOX_REFRESH_TOKEN in .env
 ```
 Owner usually runs their **own** `npm run dev` in a terminal. The Claude preview
 tool can't attach to it (it owns :5173/:8787), so to screenshot you must
@@ -96,6 +97,8 @@ achievements) · loader instead of mock flash · server type-checking.
   catalog bulk) + wishlist (store GraphQL) + game detail. Merged into steam.ts.
 - `server/providers/psn.ts` — PSN npsso→OAuth + played games (with playtime) +
   trophies (card counts + detail trophy list). Merged into steam.ts. No wishlist.
+- `server/providers/xbox.ts` — Microsoft OAuth + XBL/XSTS chain + titlehub played
+  games + per-title achievements. Merged into steam.ts. No wishlist.
 - `server/providers/igdb.ts` — Twitch auth + batched time-to-beat.
 - `src/components/Dashboard.tsx` — all dashboard math (computes from library +
   wishlist in context); `ASSUMED_HOURS_PER_GAME`, `TTB_CAP_HOURS`, cycling facts.
@@ -155,8 +158,19 @@ achievements) · loader instead of mock flash · server type-checking.
    The owner opted to capture the operationName + sha256Hash (+ store session) from
    browser DevTools; that wiring is the next PSN step (prices via
    `metGetPricingDataByConceptId`, hash `abcb311e…`).
-   **Other stores** (Xbox…) follow the same provider shape — add to
-   `providers.json`, write a `providers/<x>.ts`, merge in steam.ts's
+   **Xbox — DONE (library + achievements; no wishlist).**
+   `server/providers/xbox.ts`. Auth: `npm run xbox-login` (Microsoft OAuth public
+   client `000000004C12AE6F`, no secret) → `XBOX_REFRESH_TOKEN`. Each run refreshes
+   the MS access token then runs the XBL chain: `user.auth.xboxlive.com/user/
+   authenticate` (RpsTicket `d=<access>`, contract-version 1) → `xsts.auth.
+   xboxlive.com/xsts/authorize` (RelyingParty `http://xboxlive.com`) → `XBL3.0
+   x=<uhs>;<token>` header + XUID. Library = `titlehub` titlehistory (played
+   titles + cover + last-played + achievement summary in one call); detail = the
+   v2 achievements endpoint (contract-version 2, paginated). titleIds carried in
+   `storeId`. ⚠ Xbox **has no token-reachable wishlist** (store-web scrape only) —
+   intentionally omitted. ⚠ Not verified against a live Xbox account yet.
+   **Other stores** (Amazon has no usable API) follow the same provider shape —
+   add to `providers.json`, write a `providers/<x>.ts`, merge in steam.ts's
    getLibrary/getDashboard/getWishlist.
 2. **Community store tags** — would need scraping the store page (not in API).
 3. **Exact Steam game count** — currently 1,112 vs Steam's 1,105; the ~7 gap is

@@ -230,8 +230,8 @@ export async function getGames(): Promise<Game[]> {
 
 export const warming = () => warmingFlag
 
-export async function getGameDetail(storeId: string): Promise<GameDetail> {
-  const rec = (await loadRecords()).find((r) => r.storeId === storeId)
+export async function getGameDetail(appid: number, storeId?: string): Promise<GameDetail> {
+  const rec = (await loadRecords()).find((r) => r.appid === appid || (storeId && r.storeId === storeId))
   return {
     appid: rec ? rec.appid : 0,
     name: rec?.name ?? 'Epic game',

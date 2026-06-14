@@ -16,11 +16,12 @@ dist-ssr
 *.log
 npm-debug.log*
 
-# Editor / OS
+# Editor / OS / local tooling
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
 .idea
+.claude/
 
 # TypeScript build info
 *.tsbuildinfo

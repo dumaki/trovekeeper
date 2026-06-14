@@ -27,7 +27,8 @@ the app runs on sample data. Run it again any time to fill in or change keys.
 | `npm run setup` | Create `.env`, prompt for secrets (silent), activate the secret-guard git hook |
 | `npm run doctor` | Print a **redacted** config diagnostic — safe to paste into a GitHub issue |
 | `npm run dev` | Run web + API together |
-| `npm run build` | Type-check and build the frontend |
+| `npm run typecheck` | Type-check both the frontend (`src/`) and the server (`server/`) |
+| `npm run build` | Type-check (frontend + server) and build |
 
 ## Getting a Steam key
 

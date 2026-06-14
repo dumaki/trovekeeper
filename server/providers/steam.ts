@@ -218,7 +218,7 @@ async function fetchAchievements(appid: number): Promise<{ unlocked: number; tot
   const res = await fetch(url, { signal: AbortSignal.timeout(10_000) })
   if (res.status === 429) throw new Error('achievements 429')
   if (!res.ok) throw new Error(`achievements ${appid} -> ${res.status}`)
-  const ps = (await res.json())?.playerstats
+  const ps = ((await res.json()) as any)?.playerstats
   if (!ps?.success) return { unlocked: 0, total: 0 } // no stats / private game details
   const list: any[] = ps.achievements ?? []
   return { unlocked: list.filter((a) => a.achieved).length, total: list.length }

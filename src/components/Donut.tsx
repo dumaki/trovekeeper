@@ -21,6 +21,11 @@ export default function Donut({ title, data, caption }: DonutProps) {
   const c = 2 * Math.PI * r
   let offset = 0
   const empty = total === 0
+  // Slices are stroked circles painted in order; without this, the sub-pixel
+  // seam where the last slice meets the first lets the underlying slice's edge
+  // bleed through. A tiny dash overlap (covered by the next slice painted on
+  // top) hides every seam. Only needed when there's more than one slice.
+  const overlap = data.length > 1 ? 1.2 : 0
 
   return (
     <div className="panel donut-panel">
@@ -35,6 +40,9 @@ export default function Donut({ title, data, caption }: DonutProps) {
             {data.map((d) => {
               const frac = d.value / total
               const dash = frac * c
+              // Extend the dash by `overlap` so this slice bleeds slightly into
+              // the next, which is painted on top — seamless boundaries.
+              const drawn = Math.min(dash + overlap, c)
               const seg = (
                 <circle
                   key={d.key}
@@ -44,7 +52,7 @@ export default function Donut({ title, data, caption }: DonutProps) {
                   fill="none"
                   stroke={d.color}
                   strokeWidth={stroke}
-                  strokeDasharray={`${dash} ${c - dash}`}
+                  strokeDasharray={`${drawn} ${c - drawn}`}
                   strokeDashoffset={-offset}
                 />
               )

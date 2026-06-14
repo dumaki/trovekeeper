@@ -72,6 +72,17 @@ export default function Library() {
                 <span className="review-tag">{g.reviewPct > 0 ? `${g.reviewPct}%` : '—'}</span>
               </div>
               <div className="playtime">{g.playtimeHours > 0 ? `${g.playtimeHours}h played` : 'Unplayed'}</div>
+              {!!g.achTotal && (
+                <div className="ach-row" title={`${g.achUnlocked}/${g.achTotal} achievements`}>
+                  <div className="ach-bar">
+                    <div className="ach-fill"
+                      style={{ width: `${Math.round((g.achUnlocked! / g.achTotal) * 100)}%` }} />
+                  </div>
+                  <span className="ach-text">
+                    🏆 {g.achUnlocked}/{g.achTotal}
+                  </span>
+                </div>
+              )}
             </div>
           </article>
         ))}

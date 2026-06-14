@@ -57,13 +57,19 @@ const REVIEW_TTL = 7 * 24 * 60 * 60 * 1000  // review % drifts slowly -> weekly
 const MISS_TTL = 6 * 60 * 60 * 1000         // region-locked/delisted items: back off 6h
 const REVIEW_GATE = 100                     // boot gate releases after this many most-played reviews
 
+const ACH_TTL = 24 * 60 * 60 * 1000         // achievements change as you play -> refresh daily
+const ACH_PER_STEP = 12                      // achievements use the Web API (generous), so fetch more per tick
+
 interface ReviewEntry { pct: number; desc: string; reviewedAt: number }
 interface ReviewCache { items: Record<string, ReviewEntry> }
 interface CachedItem extends WishlistItem { pricedAt: number; reviewedAt: number; cachedAt: number }
 interface WishlistCache { items: Record<string, CachedItem>; misses: Record<string, number> }
+interface AchEntry { unlocked: number; total: number; at: number } // total 0 = game has no achievements
+interface AchCache { items: Record<string, AchEntry> }
 
 const emptyWishlistCache = (): WishlistCache => ({ items: {}, misses: {} })
 const emptyReviewCache = (): ReviewCache => ({ items: {} })
+const emptyAchCache = (): AchCache => ({ items: {} })
 
 function bandFromDesc(desc: string): ReviewBand {
   if (desc.includes('Overwhelmingly Positive')) return 'Overwhelmingly Positive'
@@ -191,19 +197,43 @@ export async function setStatus(appid: unknown, status: unknown): Promise<{ ok: 
   return { ok: true }
 }
 
+// ---- Achievements (official Steam Web API) --------------------------------
+async function getAchievements(): Promise<Record<string, AchEntry>> {
+  return (await readCache<AchCache>('achievements.json', emptyAchCache())).items
+}
+
+// Returns unlocked/total for one game. total 0 => no achievements (or the game's
+// stats aren't public). Throws on a transient failure so the warmer retries.
+async function fetchAchievements(appid: number): Promise<{ unlocked: number; total: number }> {
+  const url = new URL(`${API}/ISteamUserStats/GetPlayerAchievements/v1/`)
+  url.searchParams.set('key', key()!)
+  url.searchParams.set('steamid', id()!)
+  url.searchParams.set('appid', String(appid))
+  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) })
+  if (res.status === 429) throw new Error('achievements 429')
+  if (!res.ok) throw new Error(`achievements ${appid} -> ${res.status}`)
+  const ps = (await res.json())?.playerstats
+  if (!ps?.success) return { unlocked: 0, total: 0 } // no stats / private game details
+  const list: any[] = ps.achievements ?? []
+  return { unlocked: list.filter((a) => a.achieved).length, total: list.length }
+}
+
 // ---- Read-only request paths ---------------------------------------------
 export async function getLibrary(): Promise<{ source: Source; games: Game[] }> {
   if (!configured()) return { source: 'mock', games: mock.library }
   const games = await ownedGames()
   const rcache = await readCache<ReviewCache>('reviews.json', emptyReviewCache())
+  const acache = await getAchievements()
   const statuses = await getStatuses()
   const withData = games.map((g) => {
     const r = rcache.items[String(g.appid)]
+    const a = acache[String(g.appid)]
     const status = statuses[String(g.appid)] ?? defaultStatus(g)
     return {
       ...g,
       status,
       ...(r ? { reviewPct: r.pct, reviewBand: bandFromDesc(r.desc) } : {}),
+      ...(a ? { achUnlocked: a.unlocked, achTotal: a.total } : {}),
     }
   })
   return { source: 'live', games: withData }
@@ -302,6 +332,7 @@ export async function getProgress(): Promise<Progress> {
 // ---- Background warmer (sole cache writer) -------------------------------
 const STEP_CALLS = 6              // storefront calls per tick ...
 const STEP_INTERVAL_MS = 10_000   // ... every 10s  => ~36/min, safely under ~40/min
+const ACH_INTERVAL_MS = 9_000     // achievements pacer (Web API — generous limit)
 const COOLDOWN_MS = 5 * 60_000    // pause after a throttle
 const IDLE_MS = 5 * 60_000        // when fully warm, re-check this often for stale/new items
 
@@ -309,19 +340,31 @@ let warmerStarted = false
 export function startWarmer(): void {
   if (warmerStarted || !configured()) return
   warmerStarted = true
-  const tick = async () => {
+
+  // Two independent pacers: storefront (appdetails/appreviews, ~40/min cap) and
+  // achievements (Steam Web API, generous). Decoupled so a storefront throttle
+  // never stalls achievement progress, and vice-versa.
+  const storefront = async () => {
     let delay = STEP_INTERVAL_MS
     try {
       const { throttled, remaining } = await enrichmentStep(STEP_CALLS)
-      if (throttled) { console.log('[warmer] Steam throttled — cooling down 5m'); delay = COOLDOWN_MS }
+      if (throttled) { console.log('[warmer] storefront throttled — cooling down 5m'); delay = COOLDOWN_MS }
       else if (remaining === 0) delay = IDLE_MS
-    } catch (e) {
-      console.log('[warmer] step error:', (e as Error).message); delay = COOLDOWN_MS
-    }
-    setTimeout(tick, delay)
+    } catch (e) { console.log('[warmer] storefront error:', (e as Error).message); delay = COOLDOWN_MS }
+    setTimeout(storefront, delay)
   }
-  setTimeout(tick, 2_000)
-  console.log('[warmer] started — paced background enrichment (~36 calls/min)')
+  const achievements = async () => {
+    let delay = ACH_INTERVAL_MS
+    try {
+      const { throttled, remaining } = await achievementStep()
+      if (throttled) { console.log('[warmer] achievements throttled — cooling down 5m'); delay = COOLDOWN_MS }
+      else if (remaining === 0) delay = IDLE_MS
+    } catch (e) { console.log('[warmer] achievements error:', (e as Error).message); delay = COOLDOWN_MS }
+    setTimeout(achievements, delay)
+  }
+  setTimeout(storefront, 2_000)
+  setTimeout(achievements, 3_000)
+  console.log('[warmer] started — storefront + achievements pacers')
 }
 
 function isThrottle(e: unknown): boolean {
@@ -395,11 +438,45 @@ async function enrichmentStep(budget: number): Promise<{ spent: number; throttle
     if (rDirty) await writeCache('reviews.json', rcache)
   }
 
-  return { spent, throttled, remaining: await countRemaining(now) }
+  return { spent, throttled, remaining: await countStorefrontRemaining(now) }
 }
 
-// Count of items still needing a storefront call (un-cached or stale).
-async function countRemaining(now: number): Promise<number> {
+// One achievements batch (Steam Web API — own rate bucket, own pacer).
+async function achievementStep(): Promise<{ throttled: boolean; remaining: number }> {
+  const now = Date.now()
+  const games = await ownedGames()
+  const acache = await readCache<AchCache>('achievements.json', emptyAchCache())
+  const ownedSet = new Set(games.map((g) => String(g.appid)))
+  for (const k of Object.keys(acache.items)) if (!ownedSet.has(k)) delete acache.items[k]
+
+  let dirty = false, spent = 0, throttled = false
+  for (const g of games) {
+    if (spent >= ACH_PER_STEP) break
+    const k = String(g.appid); const c = acache.items[k]
+    if (c && now - c.at <= ACH_TTL) continue
+    try {
+      const a = await fetchAchievements(g.appid); spent++
+      acache.items[k] = { ...a, at: now }; dirty = true
+    } catch (e) {
+      spent++
+      if (isThrottle(e)) { throttled = true; break }
+      // odd app (non-game / 400): record as none so it doesn't block the rest;
+      // the daily TTL retries it later.
+      acache.items[k] = { unlocked: 0, total: 0, at: now }; dirty = true
+    }
+  }
+  if (dirty) await writeCache('achievements.json', acache)
+
+  let remaining = 0
+  for (const g of games) {
+    const a = acache.items[String(g.appid)]
+    if (!a || now - a.at > ACH_TTL) remaining++
+  }
+  return { throttled, remaining }
+}
+
+// Count of storefront items still needing a call (un-cached or stale).
+async function countStorefrontRemaining(now: number): Promise<number> {
   let n = 0
   const appids = await wishlistAppids()
   const wcache = await readCache<WishlistCache>('wishlist.json', emptyWishlistCache())

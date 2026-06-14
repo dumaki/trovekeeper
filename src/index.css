@@ -279,6 +279,10 @@ b { font-weight: 700; color: var(--text); }
 .store-tag { padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; color: #fff; }
 .review-tag { font-size: 12px; font-weight: 700; color: #6cd28a; }
 .playtime { color: var(--muted); font-size: 12.5px; }
+.ach-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.ach-bar { flex: 1; height: 5px; border-radius: 999px; background: var(--bg-2); overflow: hidden; }
+.ach-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #b8860b, #f5c518); }
+.ach-text { font-size: 11.5px; font-weight: 700; color: #e7c66b; white-space: nowrap; }
 .empty { color: var(--muted); padding: 40px; text-align: center; grid-column: 1 / -1; }
 
 /* ---------- Wishlist rows ---------- */

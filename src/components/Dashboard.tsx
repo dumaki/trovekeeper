@@ -29,8 +29,20 @@ export default function Dashboard() {
   const completePct = pct(counts.Finished)
   const dealsLive = wishlist.filter((w) => w.discountPct > 0).length
   const backlogGames = counts.Backlog + counts.Next
-  const backlogHours = backlogGames * ASSUMED_HOURS_PER_GAME
+
+  // ---- achievements: real completion signal across games that have them ----
+  const withAch = library.filter((g) => (g.achTotal ?? 0) > 0)
+  const perfectGames = withAch.filter((g) => g.achUnlocked === g.achTotal).length
+  const avgCompletion = withAch.length
+    ? Math.round((withAch.reduce((s, g) => s + g.achUnlocked! / g.achTotal!, 0) / withAch.length) * 100)
+    : 0
+
+  // ttbHours (IGDB) when available, else the flat assumption per backlog game.
+  const backlogHours = library
+    .filter((g) => g.status === 'Backlog' || g.status === 'Next')
+    .reduce((sum, g) => sum + (g.ttbHours ?? ASSUMED_HOURS_PER_GAME), 0)
   const yearsToClear = (backlogHours / (2 * 365)).toFixed(1)
+  const ttbKnown = library.some((g) => g.ttbHours != null)
 
   const statusBreakdown = STATUS_ORDER
     .filter((s) => counts[s] > 0)
@@ -69,7 +81,7 @@ export default function Dashboard() {
           <div className="hero-facts">
             <span><b>{completePct}%</b> complete</span>
             <span className="dot">·</span>
-            <span><b>~{yearsToClear} yrs</b> to clear at 2h/day</span>
+            <span><b>{ttbKnown ? '' : '~'}{yearsToClear} yrs</b> to clear at 2h/day</span>
             <span className="dot">·</span>
             <span><b>{dealsLive}</b> deals live</span>
           </div>
@@ -102,8 +114,8 @@ export default function Dashboard() {
       {/* ---- QUICK STRIP (computed from real status counts) ---- */}
       <section className="quick-strip">
         <Quick badge="P" tone={STATUS_COLOR.Playing} label={`Playing ${counts.Playing}`} sub="in progress" />
-        <Quick badge="N" tone={STATUS_COLOR.Next} label={`Next ${counts.Next}`} sub="up next" />
         <Quick badge="F" tone={STATUS_COLOR.Finished} label={`Finished ${counts.Finished}`} sub="completed" />
+        <Quick badge="🏆" tone="#f5c518" label={`${perfectGames} perfect`} sub={`${avgCompletion}% avg completion`} />
         <Quick badge="W" tone="#f5c518" label={`Wishlist ${dealsLive}`} sub="deals live now" />
         <Quick badge="S" tone="#5ab0e8" label={`Steam ${profile.steamGames.toLocaleString()}`} sub="games" />
       </section>

@@ -23,6 +23,9 @@ export interface Game {
   reviewPct: number      // 0-100 store review score
   reviewBand: ReviewBand
   headerImage: string    // cover/header art
+  achUnlocked?: number   // Steam achievements unlocked (undefined = not yet fetched)
+  achTotal?: number      // total achievements (0 = game has none)
+  ttbHours?: number      // IGDB main-story time-to-beat, hours (undefined = unknown)
 }
 
 export interface WishlistItem {

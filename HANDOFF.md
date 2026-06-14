@@ -9,10 +9,14 @@ tabs: **Dashboard**, **Library**, **Wishlist** (Wishlist has per-store sub-tabs)
 
 - **Repo:** https://github.com/dumaki/trovekeeper  (`main` is current & green)
 - **Local path:** `/Users/benhughes/Documents/Claude/TroveKeeper`
-- **Five stores connected & live-verified** in the owner's `.env`: **Steam**
-  (~1,112 games), **GOG**, **Epic**, **PSN**, **Xbox** — plus **IGDB** for
-  time-to-beat. Each non-Steam store is its own provider merged into the library,
-  dashboard donut, and the quick-strip marquee chips.
+- **Seven stores connected & live-verified** in the owner's `.env`: **Steam**
+  (~1,112 games), **GOG**, **Epic**, **PSN**, **Xbox**, **Nintendo** (eShop),
+  **itch.io** — plus **IGDB** for time-to-beat. Each non-Steam store is its own
+  provider merged into the library, dashboard donut, and the quick-strip marquee
+  chips. Store chips render real **brand logos** (`src/data/storeIcons.ts`).
+- **Store target is 10** (`storesTotal`): the 7 above + 3 remaining — **Ubisoft**
+  (next), **EA**, **Amazon**. Humble Bundle (keys already redeemed on Steam) and
+  Battle.net (no owned-games API) were intentionally dropped.
 
 ## Run / verify
 ```bash
@@ -26,6 +30,8 @@ npm run gog-login # one-time GOG OAuth: writes GOG_REFRESH_TOKEN to .env
 npm run epic-login # one-time Epic OAuth: writes EPIC_REFRESH_TOKEN to .env
 npm run psn-login # one-time PSN: writes PSN_NPSSO (npsso cookie) to .env
 npm run xbox-login # one-time Xbox: Microsoft OAuth -> XBOX_REFRESH_TOKEN in .env
+npm run nintendo-login # paste ec.nintendo.com session cookie (~30d) -> NINTENDO_COOKIE
+npm run itch-login # paste itch.io API key -> ITCH_API_KEY (verified against /profile)
 ```
 Owner usually runs their **own** `npm run dev` in a terminal. The Claude preview
 tool can't attach to it (it owns :5173/:8787), so to screenshot you must
@@ -87,7 +93,8 @@ when you don't need a visual.
   the count; the 1130→1112 drop was ads/mods/DLC/demos/betas).
 
 ## Features built (all on `main`)
-**Five-store library** (Steam/GOG/Epic/PSN/Xbox merged) · editable per-game
+**Seven-store library** (Steam/GOG/Epic/PSN/Xbox/Nintendo/itch.io merged) ·
+**real brand-logo store chips** · editable per-game
 **status** (dropdown on cards, persisted, played→Playing default) · **dashboard
 stats** computed from real data (deals-live, %complete, backlog hours, status
 donut, review-sentiment donut, **library-by-store donut**) · **scrolling
@@ -98,7 +105,7 @@ same UI) · **IGDB time-to-beat** (backlog hours, capped at 200h/game) · **cycl
 library facts** below the hero (fade every 10s, incl. skipped-games count) ·
 **non-game filtering** (Steam type + name) · **game detail modal** (info +
 scrollable locked/unlocked achievements/trophies) · **Wishlist with per-store
-tabs** (Steam/GOG/Epic, each shown only when it has items) · loader instead of
+tabs** (Steam/GOG/Epic/Nintendo, each shown only when it has items) · loader instead of
 mock flash · server type-checking.
 
 ## Key files
@@ -114,7 +121,11 @@ mock flash · server type-checking.
 - `server/providers/xbox.ts` — Microsoft OAuth + XBL/XSTS chain + titlehub played
   games + playtime (MinutesPlayed stats) + per-title achievements (v2 + 360 v1
   fallback). Merged into steam.ts. No wishlist yet.
+- `server/providers/nintendo.ts` — eShop session-cookie → `/api/auth/session`
+  id_token → savanna GraphQL purchase history. Dormant wishlist. Merged into steam.ts.
+- `server/providers/itch.ts` — itch.io API-key owned-keys library. Merged into steam.ts.
 - `server/providers/igdb.ts` — Twitch auth + batched time-to-beat.
+- `src/data/storeIcons.ts` — brand-logo SVG paths (simple-icons) for the store chips.
 - `src/components/Dashboard.tsx` — all dashboard math (computes from library +
   wishlist in context); `ASSUMED_HOURS_PER_GAME`, `TTB_CAP_HOURS`, cycling facts.
 - `src/components/Library.tsx` — grid, filters, status dropdown, opens GameModal.
@@ -195,16 +206,40 @@ Hard-won conventions:
   the existing xbox-login (same XSTS chain, swap RelyingParty — no fragile cookie).
   Just needs the wishlist data-endpoint URL (capture the Fetch/XHR request on
   xbox.com/wishlist — host likely `*.xboxservices.com` / `displaycatalog.mp.microsoft.com`).
+- **Nintendo** ✅ eShop library (`nintendo-login`). Auth is NOT a cookie scrape or
+  OAuth dance: ec.nintendo.com is a Next.js/NextAuth app, so we store its session
+  **cookie** (`__Secure-next-auth.session-token`, ~30 days) and call
+  `GET ec.nintendo.com/api/auth/session` to mint a fresh 15-min Nintendo Account
+  `id_token`, which authorizes the savanna GraphQL purchase-history query
+  (`wb.lp1.savanna.srv.nintendo.net/graphql`, persisted query
+  `TransactionsClientRootClient`, hash base64-wrapped in `nintendo.ts`). Library =
+  `data.account.transactionHistories.transactionHistories[]`, filtered to
+  itemType APPLICATION/BUNDLE + transactionType PURCHASE. Only ~2 years of digital
+  history; no cover art / playtime / achievements. **Wishlist: TODO** — the
+  nintendo.com Store wishlist is a *different* system; the provider has a dormant
+  `getWishlist` that only activates when both `NINTENDO_STORE_COOKIE` AND
+  `NINTENDO_WISHLIST_URL` are set (no guessed default → no 404). Needs a one-time
+  capture of the wishlist XHR.
+- **itch.io** ✅ library (`itch-login`). Simplest auth of any store: a personal
+  **API key** (`ITCH_API_KEY`, Bearer, long-lived) from itch.io/user/settings/
+  api-keys — no OAuth, no refresh. Library = `GET api.itch.io/profile/owned-keys`
+  (paged), owned games + cover art + short_text; non-game `classification`
+  filtered. No playtime/achievements/wishlist. itch ids hashed into appid
+  (2.7B range) like Epic/Xbox/Nintendo.
 
 ## Open follow-ups / next up
-1. **PSN wishlist + Xbox wishlist** — see the two "Wishlist: TODO" notes above.
-   Both need a one-time DevTools capture from the owner; Xbox's is mintable/clean,
-   PSN's is a persisted-query hash. (Wishlist auth tokens are short-lived → likely
-   an occasional re-paste, except Xbox if the minted-token path works.)
-2. **More stores** — **itch.io** has a real OAuth API (owned games via library /
-   claimed keys; no achievements; lightweight). **Amazon Prime Gaming** has NO
-   usable API (scraping only) — recommend skipping.
-3. **Community store tags** — would need scraping the Steam store page (not in API).
-4. **Exact Steam game count** — 1,112 vs Steam's 1,105; ~7 multiplayer-component
+1. **Ubisoft (next store)** — richest of the remaining: owned + **playtime** +
+   achievements/Units via `public-ubiservices.ubi.com` (Ubi-AppId headers). Auth =
+   capture the auth ticket from connect.ubisoft.com DevTools, refresh server-side.
+   ~1 session.
+2. **EA** then **Amazon** after Ubisoft. EA (`accounts.ea.com` OAuth → token;
+   owned + playtime + achievements — rich, but fiddly auth). Amazon (Login-with-
+   Amazon device OAuth like Nile/Heroic; owned + art only — sparse). Both
+   DevTools-capturable. **Humble Bundle + Battle.net dropped** (Humble keys all
+   redeemed on Steam already; Battle.net has no owned-games API).
+3. **Nintendo wishlist** — dormant; needs a nintendo.com wishlist XHR capture
+   (see the Nintendo "Wishlist: TODO" note). Same for **PSN + Xbox wishlist**.
+4. **Community store tags** — would need scraping the Steam store page (not in API).
+5. **Exact Steam game count** — 1,112 vs Steam's 1,105; ~7 multiplayer-component
    appids (e.g. "Modern Warfare 3 - Multiplayer"). Owner is OK with the gap.
-5. Optional: persist game-detail to disk cache (currently 10-min in-memory).
+6. Optional: persist game-detail to disk cache (currently 10-min in-memory).

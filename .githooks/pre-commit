@@ -1,0 +1,37 @@
+#!/bin/sh
+# ============================================================================
+#  Secret guard — blocks commits that would leak credentials.
+#  Activated by `npm run setup` (sets core.hooksPath = .githooks).
+#  Belt-and-suspenders with the CI gitleaks scan; this stops it locally first.
+# ============================================================================
+
+fail() {
+  printf '\n\033[31m✖ commit blocked: %s\033[0m\n' "$1" >&2
+  printf '  %s\n\n' "$2" >&2
+  exit 1
+}
+
+# 1) Never allow a real .env (or .env.<something>) to be staged. .env.example is fine.
+staged_env=$(git diff --cached --name-only | grep -E '(^|/)\.env($|\.[^/]*$)' | grep -vE '\.env\.example$' || true)
+if [ -n "$staged_env" ]; then
+  fail "an environment file is staged ($staged_env)" \
+       "Secrets must never be committed. Unstage it: git restore --staged $staged_env"
+fi
+
+# 2) Scan the staged diff for key-shaped strings (added lines only).
+added=$(git diff --cached -U0 --no-color | grep -E '^\+' | grep -vE '^\+\+\+')
+
+# Steam web API keys are 32 hex chars; also catch generic assigned secrets.
+hex32='[A-Fa-f0-9]{32}'
+assigned='(api[_-]?key|secret|token|password)["'"'"' :=]+[A-Za-z0-9_/+-]{16,}'
+
+if printf '%s' "$added" | grep -Eq "$hex32"; then
+  fail "a 32-char hex string (API-key shaped) was found in your changes" \
+       "If this is genuinely not a secret, review carefully, then commit with --no-verify."
+fi
+if printf '%s' "$added" | grep -Eiq "$assigned"; then
+  fail "an assigned secret/token/password literal was found in your changes" \
+       "Move it into .env (git-ignored). To override after review: git commit --no-verify."
+fi
+
+exit 0

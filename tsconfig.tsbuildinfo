@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/bootgate.tsx","./src/components/chesticon.tsx","./src/components/dashboard.tsx","./src/components/donut.tsx","./src/components/heroscene.tsx","./src/components/library.tsx","./src/components/wishlist.tsx","./src/data/datacontext.tsx","./src/data/mockdata.ts"],"version":"5.9.3"}

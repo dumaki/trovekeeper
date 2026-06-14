@@ -1,0 +1,23 @@
+{
+  "_comment": "Single source of truth for provider secrets. Read by the server (config.ts), the setup script, and the doctor diagnostic. Add a provider here to make it appear in setup + doctor. 'secret: true' means the value is NEVER printed, logged, or echoed anywhere.",
+  "providers": [
+    {
+      "id": "steam",
+      "label": "Steam",
+      "env": [
+        {
+          "key": "STEAM_API_KEY",
+          "required": true,
+          "secret": true,
+          "hint": "32-char key from https://steamcommunity.com/dev/apikey"
+        },
+        {
+          "key": "STEAM_ID",
+          "required": true,
+          "secret": false,
+          "hint": "17-digit SteamID64 — look it up at https://steamid.io"
+        }
+      ]
+    }
+  ]
+}

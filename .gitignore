@@ -1,0 +1,23 @@
+# ---- Secrets: never commit these ----
+.env
+.env.*
+!.env.example
+*.local
+
+# Dependencies / build
+node_modules
+dist
+dist-ssr
+
+# Local data cache (wishlist/library enrichment)
+.cache
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea

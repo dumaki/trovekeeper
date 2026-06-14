@@ -1,0 +1,72 @@
+import { useMemo, useState } from 'react'
+import { storeMeta, type GameStatus, type StoreKey } from '../data/mockData'
+import { useData } from '../data/DataContext'
+
+const STATUS_TONE: Record<GameStatus, string> = {
+  Backlog: '#ef4444', Playing: '#f5c518', Finished: '#22c55e', Next: '#38bdf8', Skip: '#64748b',
+}
+
+const stores = ['All', ...Object.keys(storeMeta)] as (StoreKey | 'All')[]
+const statuses: (GameStatus | 'All')[] = ['All', 'Playing', 'Next', 'Backlog', 'Finished', 'Skip']
+
+export default function Library() {
+  const { library } = useData()
+  const [store, setStore] = useState<StoreKey | 'All'>('All')
+  const [status, setStatus] = useState<GameStatus | 'All'>('All')
+  const [q, setQ] = useState('')
+
+  const games = useMemo(() => library.filter((g) =>
+    (store === 'All' || g.store === store) &&
+    (status === 'All' || g.status === status) &&
+    g.name.toLowerCase().includes(q.toLowerCase())
+  ), [library, store, status, q])
+
+  return (
+    <div className="page">
+      <div className="page-head">
+        <div>
+          <h1>Library</h1>
+          <p className="page-sub">{games.length} of {library.length} games shown</p>
+        </div>
+        <input className="search" placeholder="Search games…" value={q}
+          onChange={(e) => setQ(e.target.value)} />
+      </div>
+
+      <div className="filter-bar">
+        <div className="filter-group">
+          {stores.map((s) => (
+            <button key={s} className={`chip ${store === s ? 'on' : ''}`} onClick={() => setStore(s)}>{s}</button>
+          ))}
+        </div>
+        <div className="filter-group">
+          {statuses.map((s) => (
+            <button key={s} className={`chip ${status === s ? 'on' : ''}`} onClick={() => setStatus(s)}>{s}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="game-grid">
+        {games.map((g) => (
+          <article key={g.appid} className="game-card">
+            <div className="cover">
+              <img src={g.headerImage} alt={g.name} loading="lazy"
+                onError={(e) => { (e.currentTarget.style.visibility = 'hidden') }} />
+              <span className="status-badge" style={{ background: STATUS_TONE[g.status] }}>{g.status}</span>
+            </div>
+            <div className="game-meta">
+              <h3 title={g.name}>{g.name}</h3>
+              <div className="game-row">
+                <span className="store-tag" style={{ background: storeMeta[g.store].color }}>
+                  {storeMeta[g.store].label}
+                </span>
+                <span className="review-tag">{g.reviewPct > 0 ? `${g.reviewPct}%` : '—'}</span>
+              </div>
+              <div className="playtime">{g.playtimeHours > 0 ? `${g.playtimeHours}h played` : 'Unplayed'}</div>
+            </div>
+          </article>
+        ))}
+        {games.length === 0 && <p className="empty">No games match these filters.</p>}
+      </div>
+    </div>
+  )
+}

@@ -5,12 +5,13 @@ import { useData } from '../data/DataContext'
 const STATUS_TONE: Record<GameStatus, string> = {
   Backlog: '#ef4444', Playing: '#f5c518', Finished: '#22c55e', Next: '#38bdf8', Skip: '#64748b',
 }
+const STATUS_OPTIONS: GameStatus[] = ['Backlog', 'Playing', 'Next', 'Finished', 'Skip']
 
 const stores = ['All', ...Object.keys(storeMeta)] as (StoreKey | 'All')[]
 const statuses: (GameStatus | 'All')[] = ['All', 'Playing', 'Next', 'Backlog', 'Finished', 'Skip']
 
 export default function Library() {
-  const { library } = useData()
+  const { library, setGameStatus } = useData()
   const [store, setStore] = useState<StoreKey | 'All'>('All')
   const [status, setStatus] = useState<GameStatus | 'All'>('All')
   const [q, setQ] = useState('')
@@ -51,7 +52,16 @@ export default function Library() {
             <div className="cover">
               <img src={g.headerImage} alt={g.name} loading="lazy"
                 onError={(e) => { (e.currentTarget.style.visibility = 'hidden') }} />
-              <span className="status-badge" style={{ background: STATUS_TONE[g.status] }}>{g.status}</span>
+              {/* status badge doubles as the editor — change it to re-tag the game */}
+              <select
+                className="status-badge status-select"
+                value={g.status}
+                style={{ background: STATUS_TONE[g.status] }}
+                onChange={(e) => setGameStatus(g.appid, e.target.value as GameStatus)}
+                aria-label={`Status for ${g.name}`}
+              >
+                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
             </div>
             <div className="game-meta">
               <h3 title={g.name}>{g.name}</h3>

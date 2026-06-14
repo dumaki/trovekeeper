@@ -1,14 +1,40 @@
 import { useState } from 'react'
-import { storeMeta } from '../data/mockData'
+import { storeMeta, type GameStatus } from '../data/mockData'
 import { useData } from '../data/DataContext'
 import HeroScene from './HeroScene'
 import Donut from './Donut'
 
 const heroStores = Object.keys(storeMeta) as (keyof typeof storeMeta)[]
 
+const STATUS_COLOR: Record<GameStatus, string> = {
+  Backlog: '#ef4444', Playing: '#f5c518', Finished: '#22c55e', Next: '#38bdf8', Skip: '#64748b',
+}
+const STATUS_ORDER: GameStatus[] = ['Backlog', 'Playing', 'Finished', 'Next', 'Skip']
+
+// Rough per-game length used only for the "years to clear" vanity estimate —
+// Steam exposes no time-to-beat data, so this is a transparent assumption.
+const ASSUMED_HOURS_PER_GAME = 8
+
 export default function Dashboard() {
-  const { dashboard } = useData()
-  const { profile, trending, libraryByStore, statusBreakdown, reviewSentiment } = dashboard
+  const { dashboard, library, wishlist } = useData()
+  const { profile, trending, libraryByStore, reviewSentiment } = dashboard
+
+  // ---- everything status/deal-derived is computed from real data, so it
+  // stays correct and reacts instantly to status edits in the Library tab ----
+  const counts = { Backlog: 0, Playing: 0, Finished: 0, Next: 0, Skip: 0 }
+  for (const g of library) counts[g.status]++
+  const total = library.length
+  const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0)
+
+  const completePct = pct(counts.Finished)
+  const dealsLive = wishlist.filter((w) => w.discountPct > 0).length
+  const backlogGames = counts.Backlog + counts.Next
+  const backlogHours = backlogGames * ASSUMED_HOURS_PER_GAME
+  const yearsToClear = (backlogHours / (2 * 365)).toFixed(1)
+
+  const statusBreakdown = STATUS_ORDER
+    .filter((s) => counts[s] > 0)
+    .map((s) => ({ key: s, value: pct(counts[s]), color: STATUS_COLOR[s] }))
 
   const [t, setT] = useState(0)
   const cur = trending[t % trending.length]
@@ -41,16 +67,16 @@ export default function Dashboard() {
           </div>
 
           <div className="hero-facts">
-            <span><b>{profile.completePct}%</b> complete</span>
+            <span><b>{completePct}%</b> complete</span>
             <span className="dot">·</span>
-            <span><b>{profile.yearsToClear} yrs</b> to clear at 2h/day</span>
+            <span><b>~{yearsToClear} yrs</b> to clear at 2h/day</span>
             <span className="dot">·</span>
-            <span><b>{profile.dealsLive}</b> deals live</span>
+            <span><b>{dealsLive}</b> deals live</span>
           </div>
 
           <div className="stat-cards">
-            <Stat value={`${profile.playedHours}h`} label="Played" />
-            <Stat value={`${profile.backlogHours.toLocaleString()}h`} label="Backlog" />
+            <Stat value={`${profile.playedHours.toLocaleString()}h`} label="Played" />
+            <Stat value={backlogGames.toLocaleString()} label="Backlog" />
             <Stat value={`${profile.avgReviewPct}%`} label="Avg Review" />
           </div>
 
@@ -73,13 +99,13 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* ---- QUICK STRIP ---- */}
+      {/* ---- QUICK STRIP (computed from real status counts) ---- */}
       <section className="quick-strip">
-        <Quick badge="6" tone="#64748b" label="avg" sub="across library" />
-        <Quick badge="i" tone="#7b3ff2" label={`itch.io ${profile.itchBundleKeys.toLocaleString()}`} sub="bundle keys" />
-        <Quick badge="W" tone="#f5c518" label={`Wishlist ${profile.dealsLive}`} sub="deals live now" />
-        <Quick badge="C" tone="#22c55e" label={`Complete ${profile.completePct}%`} sub="of library finished" />
-        <Quick badge="S" tone="#5ab0e8" label={`Steam ${profile.steamGames}`} sub="games" />
+        <Quick badge="P" tone={STATUS_COLOR.Playing} label={`Playing ${counts.Playing}`} sub="in progress" />
+        <Quick badge="N" tone={STATUS_COLOR.Next} label={`Next ${counts.Next}`} sub="up next" />
+        <Quick badge="F" tone={STATUS_COLOR.Finished} label={`Finished ${counts.Finished}`} sub="completed" />
+        <Quick badge="W" tone="#f5c518" label={`Wishlist ${dealsLive}`} sub="deals live now" />
+        <Quick badge="S" tone="#5ab0e8" label={`Steam ${profile.steamGames.toLocaleString()}`} sub="games" />
       </section>
 
       {/* ---- DONUTS ---- */}
@@ -91,10 +117,8 @@ export default function Dashboard() {
         />
         <Donut
           title="Status Breakdown"
-          data={statusBreakdown ?? []}
-          caption={statusBreakdown
-            ? <><b>{pctOf(statusBreakdown, 'Backlog')}%</b> still in backlog</>
-            : 'Set play status on your games to see this'}
+          data={statusBreakdown}
+          caption={<><b>{pct(counts.Backlog)}%</b> still in backlog</>}
         />
         <Donut
           title="Review Sentiment"
@@ -106,10 +130,6 @@ export default function Dashboard() {
       </section>
     </div>
   )
-}
-
-function pctOf(slices: { key: string; value: number }[], key: string) {
-  return slices.find((s) => s.key === key)?.value ?? 0
 }
 
 function Stat({ value, label }: { value: string; label: string }) {

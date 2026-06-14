@@ -8,6 +8,7 @@ import { redact } from './redact'
 import * as steam from './providers/steam'
 
 const app = express()
+app.use(express.json()) // parse JSON bodies for POST routes
 // Dedicated API port — deliberately NOT the ambient PORT (which the web dev
 // server / hosts use), so the two never collide. vite proxies /api here.
 const PORT = Number(process.env.API_PORT) || 8787
@@ -32,6 +33,7 @@ app.get('/api/dashboard', route(() => steam.getDashboard()))
 app.get('/api/library', route(() => steam.getLibrary()))
 app.get('/api/wishlist', route(() => steam.getWishlist()))
 app.get('/api/progress', route(() => steam.getProgress())) // boot-gate polling
+app.post('/api/status', route((req) => steam.setStatus(req.body?.appid, req.body?.status)))
 
 app.listen(PORT, () => {
   const live = steam.configured()

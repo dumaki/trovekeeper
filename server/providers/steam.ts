@@ -164,16 +164,49 @@ async function wishlistAppids(): Promise<number[]> {
   return wishInflight
 }
 
+// ---- User-set play status (persisted) ------------------------------------
+// Steam doesn't track Backlog/Playing/Finished/etc., so it's app-side state.
+// Default heuristic: a game with playtime is "Playing", an unplayed one is
+// "Backlog" — the user refines from there, and choices persist to disk.
+const STATUS_VALUES: GameStatus[] = ['Backlog', 'Playing', 'Finished', 'Next', 'Skip']
+interface StatusCache { items: Record<string, GameStatus> }
+
+async function getStatuses(): Promise<Record<string, GameStatus>> {
+  return (await readCache<StatusCache>('statuses.json', { items: {} })).items
+}
+
+function defaultStatus(g: Game): GameStatus {
+  return g.playtimeHours > 0 ? 'Playing' : 'Backlog'
+}
+
+export async function setStatus(appid: unknown, status: unknown): Promise<{ ok: true }> {
+  const idNum = Number(appid)
+  if (!Number.isFinite(idNum)) throw new Error('invalid appid')
+  if (typeof status !== 'string' || !STATUS_VALUES.includes(status as GameStatus)) {
+    throw new Error('invalid status')
+  }
+  const cache = await readCache<StatusCache>('statuses.json', { items: {} })
+  cache.items[String(idNum)] = status as GameStatus
+  await writeCache('statuses.json', cache)
+  return { ok: true }
+}
+
 // ---- Read-only request paths ---------------------------------------------
 export async function getLibrary(): Promise<{ source: Source; games: Game[] }> {
   if (!configured()) return { source: 'mock', games: mock.library }
   const games = await ownedGames()
   const rcache = await readCache<ReviewCache>('reviews.json', emptyReviewCache())
-  const withReviews = games.map((g) => {
+  const statuses = await getStatuses()
+  const withData = games.map((g) => {
     const r = rcache.items[String(g.appid)]
-    return r ? { ...g, reviewPct: r.pct, reviewBand: bandFromDesc(r.desc) } : g
+    const status = statuses[String(g.appid)] ?? defaultStatus(g)
+    return {
+      ...g,
+      status,
+      ...(r ? { reviewPct: r.pct, reviewBand: bandFromDesc(r.desc) } : {}),
+    }
   })
-  return { source: 'live', games: withReviews }
+  return { source: 'live', games: withData }
 }
 
 export async function getDashboard(): Promise<DashboardPayload> {

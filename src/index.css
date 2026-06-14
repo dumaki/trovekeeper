@@ -263,6 +263,16 @@ b { font-weight: 700; color: var(--text); }
   padding: 3px 9px; border-radius: 999px;
   font-size: 11px; font-weight: 700; color: #06121f;
 }
+/* status badge as an inline editor */
+.status-select.status-badge {
+  border: none; cursor: pointer; padding: 4px 10px;
+  -webkit-appearance: none; appearance: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  transition: filter 0.12s;
+}
+.status-select.status-badge:hover { filter: brightness(1.08); }
+.status-select.status-badge:focus { outline: 2px solid rgba(255,255,255,0.6); outline-offset: 1px; }
+.status-select.status-badge option { color: var(--text); background: var(--panel); font-weight: 600; }
 .game-meta { padding: 12px 14px; }
 .game-meta h3 { font-size: 14.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .game-row { display: flex; align-items: center; gap: 8px; margin: 8px 0 6px; }

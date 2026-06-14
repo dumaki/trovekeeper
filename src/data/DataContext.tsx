@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import * as mock from './mockData'
 import type {
   Game, WishlistItem, GameStatus, StoreKey,
@@ -42,7 +42,11 @@ const MOCK: DataState = {
   wishlistPending: 0,
 }
 
-const Ctx = createContext<DataState>({ ...MOCK, source: 'loading' })
+interface DataContextValue extends DataState {
+  setGameStatus: (appid: number, status: GameStatus) => void
+}
+
+const Ctx = createContext<DataContextValue>({ ...MOCK, source: 'loading', setGameStatus: () => {} })
 export const useData = () => useContext(Ctx)
 
 async function getJson<T>(path: string): Promise<T> {
@@ -88,6 +92,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true }
   }, [])
 
+  // Optimistically update the game's status locally (so the dashboard donut +
+  // counts react instantly) and persist it server-side.
+  const setGameStatus = useCallback((appid: number, status: GameStatus) => {
+    setState((prev) => prev
+      ? { ...prev, library: prev.library.map((g) => g.appid === appid ? { ...g, status } : g) }
+      : prev)
+    fetch('/api/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appid, status }),
+    }).catch(() => { /* offline/no-backend: keep the optimistic local change */ })
+  }, [])
+
   if (!state) return <LoadingScreen />
-  return <Ctx.Provider value={state}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={{ ...state, setGameStatus }}>{children}</Ctx.Provider>
 }

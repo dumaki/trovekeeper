@@ -62,6 +62,13 @@ const ACH_TTL = 24 * 60 * 60 * 1000         // achievements change as you play -
 const ACH_PER_STEP = 12                      // achievements use the Web API (generous), so fetch more per tick
 const TTB_TTL = 30 * 24 * 60 * 60 * 1000     // time-to-beat barely changes -> refresh monthly
 const TTB_PER_STEP = 500                      // appids resolved per IGDB step (batched internally)
+const TYPE_TTL = 90 * 24 * 60 * 60 * 1000    // an app's type never changes -> refresh rarely
+
+// Steam app types that aren't "games" — filtered from the library so the count
+// matches Steam (soundtracks=music, plus demos/videos/DLC/etc.). Apps whose type
+// is unknown (not yet fetched, or no store page) default to "game" so genuinely
+// delisted games (e.g. old GTA titles) are never wrongly dropped.
+const NON_GAME_TYPES = new Set(['music', 'video', 'movie', 'demo', 'dlc', 'mod', 'advertising', 'episode', 'series', 'hardware'])
 
 interface ReviewEntry { pct: number; desc: string; reviewedAt: number }
 interface ReviewCache { items: Record<string, ReviewEntry> }
@@ -71,11 +78,14 @@ interface AchEntry { unlocked: number; total: number; at: number } // total 0 = 
 interface AchCache { items: Record<string, AchEntry> }
 interface TtbEntry { hours: number | null; at: number }            // null = IGDB has no time-to-beat
 interface TtbCache { items: Record<string, TtbEntry> }
+interface TypeEntry { type: string; at: number }
+interface TypeCache { items: Record<string, TypeEntry> }
 
 const emptyWishlistCache = (): WishlistCache => ({ items: {}, misses: {} })
 const emptyReviewCache = (): ReviewCache => ({ items: {} })
 const emptyAchCache = (): AchCache => ({ items: {} })
 const emptyTtbCache = (): TtbCache => ({ items: {} })
+const emptyTypeCache = (): TypeCache => ({ items: {} })
 
 function bandFromDesc(desc: string): ReviewBand {
   if (desc.includes('Overwhelmingly Positive')) return 'Overwhelmingly Positive'
@@ -150,13 +160,28 @@ function breakdown<K extends string>(
 const LIST_TTL = 5 * 60 * 1000
 let ownedMemo: { at: number; games: Game[] } | null = null
 let ownedInflight: Promise<Game[]> | null = null
-async function ownedGames(): Promise<Game[]> {
+// Full owned-apps list straight from Steam (includes soundtracks/demos/etc.).
+// Used by the type warmer, which must see everything to classify it.
+async function ownedGamesRaw(): Promise<Game[]> {
   if (ownedMemo && Date.now() - ownedMemo.at < LIST_TTL) return ownedMemo.games
   if (ownedInflight) return ownedInflight
   ownedInflight = fetchOwnedGames()
     .then((g) => { ownedMemo = { at: Date.now(), games: g }; return g })
     .finally(() => { ownedInflight = null })
   return ownedInflight
+}
+
+async function getAppTypes(): Promise<Record<string, TypeEntry>> {
+  return (await readCache<TypeCache>('apptypes.json', emptyTypeCache())).items
+}
+
+// The "games" view: the raw list minus anything classified as a non-game type.
+// Everything downstream (library, dashboard, review/achievement warmers) uses
+// this, so the count and stats match Steam's game count.
+async function ownedGames(): Promise<Game[]> {
+  const raw = await ownedGamesRaw()
+  const types = await getAppTypes()
+  return raw.filter((g) => !NON_GAME_TYPES.has(types[String(g.appid)]?.type ?? 'game'))
 }
 
 let wishMemo: { at: number; appids: number[] } | null = null
@@ -457,6 +482,25 @@ async function enrichmentStep(budget: number): Promise<{ spent: number; throttle
     if (rDirty) await writeCache('reviews.json', rcache)
   }
 
+  // ---- App type (classify soundtracks/demos/etc. out of the library) ----
+  if (!throttled && spent < budget) {
+    const raw = await ownedGamesRaw()
+    const tcache = await readCache<TypeCache>('apptypes.json', emptyTypeCache())
+    const ownedSet = new Set(raw.map((g) => String(g.appid)))
+    for (const k of Object.keys(tcache.items)) if (!ownedSet.has(k)) delete tcache.items[k]
+    let tDirty = false
+    for (const g of raw) {
+      if (spent >= budget || throttled) break
+      const k = String(g.appid); const c = tcache.items[k]
+      if (c && now - c.at <= TYPE_TTL) continue
+      try {
+        const type = await fetchAppType(g.appid); spent++
+        tcache.items[k] = { type, at: now }; tDirty = true
+      } catch (e) { if (isThrottle(e)) throttled = true }
+    }
+    if (tDirty) await writeCache('apptypes.json', tcache)
+  }
+
   return { spent, throttled, remaining: await countStorefrontRemaining(now) }
 }
 
@@ -538,10 +582,32 @@ async function countStorefrontRemaining(now: number): Promise<number> {
     const c = rcache.items[String(g.appid)]
     if (!c || now - c.reviewedAt > REVIEW_TTL) n++
   }
+  const raw = await ownedGamesRaw()
+  const tcache = await readCache<TypeCache>('apptypes.json', emptyTypeCache())
+  for (const g of raw) {
+    const c = tcache.items[String(g.appid)]
+    if (!c || now - c.at > TYPE_TTL) n++
+  }
   return n
 }
 
 // ---- Storefront fetchers --------------------------------------------------
+// An app's store type ("game" | "music" | "demo" | "dlc" | ...). Returns
+// 'unknown' when the app has no store page (delisted) so it stays counted as a
+// game; THROWS on throttle/transient errors so it's retried, not mis-classified.
+async function fetchAppType(appid: number): Promise<string> {
+  const res = await fetch(
+    `https://store.steampowered.com/api/appdetails?appids=${appid}&filters=basic`,
+    { signal: AbortSignal.timeout(12_000) },
+  )
+  if (!res.ok) throw new Error(`appdetails ${appid} -> ${res.status}`)
+  const body = (await res.json()) as Record<string, any> | null
+  const entry = body?.[String(appid)]
+  if (!entry) throw new Error(`appdetails ${appid} -> empty response`)
+  if (entry.success === false) return 'unknown' // no store page -> keep as game
+  return entry.data?.type ?? 'unknown'
+}
+
 // Store details for one app. Returns null ONLY when Steam explicitly says the
 // app is unavailable (success:false). Anything else (non-200/throttled/malformed)
 // THROWS, so the warmer treats it as transient and retries instead of tombstoning.

@@ -25,6 +25,7 @@ interface DataState {
   wishlist: WishlistItem[]
   wishlistTotal: number   // full wishlist size (may exceed loaded items while caching)
   wishlistPending: number // items not yet enriched this session
+  gogWishlist: WishlistItem[] // GOG wishlist (separate tab)
 }
 
 const MOCK: DataState = {
@@ -40,10 +41,11 @@ const MOCK: DataState = {
   wishlist: mock.wishlist,
   wishlistTotal: mock.wishlist.length,
   wishlistPending: 0,
+  gogWishlist: mock.gogWishlist,
 }
 
 interface DataContextValue extends DataState {
-  setGameStatus: (appid: number, status: GameStatus) => void
+  setGameStatus: (appid: number, status: GameStatus, store: StoreKey) => void
 }
 
 const Ctx = createContext<DataContextValue>({ ...MOCK, source: 'loading', setGameStatus: () => {} })
@@ -67,7 +69,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const [dash, lib, wish] = await Promise.all([
           getJson<Dashboard & { source: string }>('/api/dashboard'),
           getJson<{ source: string; games: Game[] }>('/api/library'),
-          getJson<{ source: string; items: WishlistItem[]; total: number; pending: number }>('/api/wishlist'),
+          getJson<{ source: string; items: WishlistItem[]; total: number; pending: number; gog?: WishlistItem[] }>('/api/wishlist'),
         ])
         if (cancelled) return
         setState({
@@ -83,6 +85,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           wishlist: wish.items,
           wishlistTotal: wish.total ?? wish.items.length,
           wishlistPending: wish.pending ?? 0,
+          gogWishlist: wish.gog ?? [],
         })
       } catch {
         // Backend unreachable (e.g. running `vite` alone) — use bundled mock.
@@ -94,14 +97,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Optimistically update the game's status locally (so the dashboard donut +
   // counts react instantly) and persist it server-side.
-  const setGameStatus = useCallback((appid: number, status: GameStatus) => {
+  const setGameStatus = useCallback((appid: number, status: GameStatus, store: StoreKey) => {
+    // Match on appid AND store — ids are only unique within a store.
     setState((prev) => prev
-      ? { ...prev, library: prev.library.map((g) => g.appid === appid ? { ...g, status } : g) }
+      ? { ...prev, library: prev.library.map((g) => g.appid === appid && g.store === store ? { ...g, status } : g) }
       : prev)
     fetch('/api/status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ appid, status }),
+      body: JSON.stringify({ appid, status, store }),
     }).catch(() => { /* offline/no-backend: keep the optimistic local change */ })
   }, [])
 

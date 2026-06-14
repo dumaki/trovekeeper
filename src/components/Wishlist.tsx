@@ -1,15 +1,24 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../data/DataContext'
+import { storeMeta } from '../data/mockData'
 
 type Sort = 'deal' | 'price' | 'review' | 'name'
+type StoreTab = 'Steam' | 'GOG'
 
 export default function Wishlist() {
-  const { wishlist, wishlistTotal, wishlistPending } = useData()
+  const { wishlist, wishlistTotal, wishlistPending, gogWishlist } = useData()
   const [sort, setSort] = useState<Sort>('deal')
   const [onlyDeals, setOnlyDeals] = useState(false)
+  const [storeTab, setStoreTab] = useState<StoreTab>('Steam')
+
+  // The GOG tab only appears once that wishlist has items, mirroring how the
+  // dashboard only surfaces connected stores.
+  const hasGog = gogWishlist.length > 0
+  const tab: StoreTab = hasGog ? storeTab : 'Steam'
+  const source = tab === 'GOG' ? gogWishlist : wishlist
 
   const items = useMemo(() => {
-    const list = onlyDeals ? wishlist.filter((w) => w.discountPct > 0) : [...wishlist]
+    const list = onlyDeals ? source.filter((w) => w.discountPct > 0) : [...source]
     list.sort((a, b) => {
       switch (sort) {
         case 'deal': return b.discountPct - a.discountPct
@@ -19,10 +28,16 @@ export default function Wishlist() {
       }
     })
     return list
-  }, [wishlist, sort, onlyDeals])
+  }, [source, sort, onlyDeals])
 
-  const dealsLive = wishlist.filter((w) => w.discountPct > 0).length
-  const totalSavings = wishlist.reduce((s, w) => s + (w.origPrice - w.price), 0)
+  const dealsLive = source.filter((w) => w.discountPct > 0).length
+  const totalSavings = source.reduce((s, w) => s + (w.origPrice - w.price), 0)
+
+  // Count label differs per tab: Steam can still be caching items in the
+  // background; GOG loads as one batch, so it's just a plain count.
+  const countLabel = tab === 'GOG'
+    ? <>{gogWishlist.length} games · </>
+    : (wishlistPending > 0 ? <>{wishlist.length} of {wishlistTotal} loaded · </> : <>{wishlistTotal} games · </>)
 
   return (
     <div className="page">
@@ -30,12 +45,10 @@ export default function Wishlist() {
         <div>
           <h1>Wishlist</h1>
           <p className="page-sub">
-            {wishlistPending > 0
-              ? <>{wishlist.length} of {wishlistTotal} loaded · </>
-              : <>{wishlistTotal} games · </>}
+            {countLabel}
             <b style={{ color: '#f5c518' }}>{dealsLive} deals live</b> ·
             ${totalSavings.toFixed(0)} potential savings
-            {wishlistPending > 0 && (
+            {tab === 'Steam' && wishlistPending > 0 && (
               <span className="muted"> · caching {wishlistPending} more, reload to fill in</span>
             )}
           </p>
@@ -53,7 +66,20 @@ export default function Wishlist() {
         </div>
       </div>
 
+      {hasGog && (
+        <div className="wish-tabs">
+          {(['Steam', 'GOG'] as StoreTab[]).map((s) => (
+            <button key={s} className={`wish-tab ${tab === s ? 'on' : ''}`} onClick={() => setStoreTab(s)}>
+              <span className="wish-tab-badge" style={{ background: storeMeta[s].color }}>{storeMeta[s].glyph}</span>
+              {storeMeta[s].label}
+              <span className="count">{(s === 'GOG' ? gogWishlist : wishlist).length}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="wish-list">
+        {items.length === 0 && <p className="empty">Nothing on this wishlist yet.</p>}
         {items.map((w) => (
           <article key={w.appid} className="wish-row">
             <img className="wish-cover" src={w.headerImage} alt={w.name} loading="lazy"

@@ -19,6 +19,7 @@ npm run dev       # web :5173, API :8787 (concurrently)
 npm run typecheck # tsc over src/ AND server/  (run before committing)
 npm run doctor    # redacted config diagnostic (safe to share)
 npm run whoami    # resolve your SteamID64 from a vanity name
+npm run gog-login # one-time GOG OAuth: writes GOG_REFRESH_TOKEN to .env
 ```
 Owner usually runs their **own** `npm run dev` in a terminal. The Claude preview
 tool can't attach to it (it owns :5173/:8787), so to screenshot you must
@@ -87,6 +88,8 @@ achievements) · loader instead of mock flash · server type-checking.
 - `server/providers/steam.ts` — the big one: owned games, all caches, the 3-loop
   warmer, every enrichment fetcher, `getGameDetail`, status persistence, the
   non-game filter (`NON_GAME_TYPES` + `NON_GAME_NAME_RE`).
+- `server/providers/gog.ts` — GOG OAuth token management + owned-library fetch
+  (paged getFilteredProducts) + GOG game detail. Merged into steam.ts.
 - `server/providers/igdb.ts` — Twitch auth + batched time-to-beat.
 - `src/components/Dashboard.tsx` — all dashboard math (computes from library +
   wishlist in context); `ASSUMED_HOURS_PER_GAME`, `TTB_CAP_HOURS`, cycling facts.
@@ -104,10 +107,24 @@ achievements) · loader instead of mock flash · server type-checking.
   scope (owner has it).
 
 ## Open follow-ups / next up
-1. **Add other stores** (GOG, Epic, PSN…) — the next big feature. UI already has
-   multi-store scaffolding (storeMeta, store chips). Each needs its own provider +
-   auth; no clean public APIs for some (may need session/cookie fetchers — the
-   hero microcopy already says "fetchers use your browser session").
+1. **GOG — DONE (basics).** `server/providers/gog.ts` merges the user's GOG
+   library alongside Steam. Auth: `npm run gog-login` (GOG Galaxy's public OAuth
+   client → long-lived refresh token in `.env`; server mints access tokens and
+   handles rotation via `.cache/gog_auth.json`). Owned titles + cover art only —
+   GOG has no public playtime or review-% endpoint, so GOG cards show 0h/no
+   review and the detail modal has a description but no achievements. Statuses are
+   now store-namespaced (`statusKey()` in steam.ts; Steam keys stay bare, GOG is
+   `GOG:<id>`), and `/api/status` + `/api/game/:appid` take a `store`. The
+   **GOG wishlist** is also wired (separate Steam/GOG tabs on the Wishlist page):
+   `gog.getWishlist()` reads `embed.gog.com/user/wishlist.json` (ids) and enriches
+   each via the public products + prices APIs, cached to `.cache/gog_wishlist.json`
+   and refreshed by the GOG warmer; `/api/wishlist` returns it as a `gog[]` field.
+   ⚠ The GOG **price** parse (`api.gog.com/products/{id}/prices`, "1999 USD" →
+   $19.99) is the one bit not yet verified against a live account — titles/art are
+   solid, prices degrade to TBA if the shape differs. **Next GOG polish:** GOG
+   playtime (embed.gog.com user stats, if reliable) and GOG achievements. **Other
+   stores** (Epic, PSN…) follow the same provider shape — add to `providers.json`,
+   write a `providers/<x>.ts`, merge it in steam.ts's getLibrary/getDashboard/getWishlist.
 2. **Community store tags** — would need scraping the store page (not in API).
 3. **Exact Steam game count** — currently 1,112 vs Steam's 1,105; the ~7 gap is
    multiplayer-component appids (e.g. "Modern Warfare 3 - Multiplayer") Steam

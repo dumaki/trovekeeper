@@ -39,7 +39,7 @@ export default function GameModal({ game, onClose }: { game: Game; onClose: () =
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    fetch(`/api/game/${game.appid}`)
+    fetch(`/api/game/${game.appid}?store=${encodeURIComponent(game.store)}`)
       .then((r) => r.json())
       .then((d) => { if (!cancelled) { setDetail(d); setLoading(false) } })
       .catch(() => { if (!cancelled) setLoading(false) })
@@ -93,7 +93,11 @@ export default function GameModal({ game, onClose }: { game: Game; onClose: () =
             {loading ? (
               <p className="muted">Loading…</p>
             ) : achievements.length === 0 ? (
-              <p className="muted">This game has no Steam achievements.</p>
+              <p className="muted">
+                {game.store === 'Steam'
+                  ? 'This game has no Steam achievements.'
+                  : `Achievements aren't available for ${game.store} titles.`}
+              </p>
             ) : (
               <div className="ach-list">
                 {achievements.map((a) => {

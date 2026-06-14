@@ -61,7 +61,7 @@ export default function Library() {
                 value={g.status}
                 style={{ background: STATUS_TONE[g.status] }}
                 onClick={(e) => e.stopPropagation()}
-                onChange={(e) => setGameStatus(g.appid, e.target.value as GameStatus)}
+                onChange={(e) => setGameStatus(g.appid, e.target.value as GameStatus, g.store)}
                 aria-label={`Status for ${g.name}`}
               >
                 {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}

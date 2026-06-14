@@ -1,6 +1,9 @@
-// Steam provider. When STEAM_API_KEY + STEAM_ID are set, fetches live data from
-// the Steam Web API; otherwise returns the bundled mock so the app runs out of
-// the box. The mock is the single source of truth shared with the frontend.
+// Steam provider + multi-store aggregation hub. When STEAM_API_KEY + STEAM_ID
+// are set, fetches live data from the Steam Web API; otherwise returns the
+// bundled mock so the app runs out of the box. The request paths here also merge
+// in other configured providers (currently GOG via ./gog) so the library and
+// dashboard span every connected store. The mock is the single source of truth
+// shared with the frontend.
 //
 // Architecture:
 //   - Request paths (getLibrary/getDashboard/getWishlist/getProgress) are
@@ -14,6 +17,7 @@ import type {
 } from '../../src/data/mockData'
 import { readCache, writeCache } from '../cache'
 import { igdbConfigured, fetchTimeToBeat } from './igdb'
+import * as gog from './gog'
 
 const API = 'https://api.steampowered.com'
 const hdr = (appid: number) =>
@@ -37,6 +41,18 @@ interface DashboardPayload {
 
 const STATUS_COLOR: Record<GameStatus, string> = {
   Backlog: '#ef4444', Playing: '#f5c518', Finished: '#22c55e', Next: '#38bdf8', Skip: '#64748b',
+}
+
+// Per-store donut colors for the "Library by Store" chart (merged across providers).
+const STORE_COLOR: Partial<Record<StoreKey, string>> = {
+  Steam: '#5ab0e8', GOG: '#7b3ff2',
+}
+
+// Play-status is app-side state keyed per game. Steam keys stay bare (the appid)
+// for backward compatibility with existing caches; other stores are namespaced
+// so a GOG product id can't collide with a Steam appid.
+function statusKey(store: StoreKey, appid: number): string {
+  return store === 'Steam' ? String(appid) : `${store}:${appid}`
 }
 
 // Steam's review descriptors -> donut colors (green = good, amber = mixed, red = bad).
@@ -224,14 +240,16 @@ function defaultStatus(g: Game): GameStatus {
   return g.playtimeHours > 0 ? 'Playing' : 'Backlog'
 }
 
-export async function setStatus(appid: unknown, status: unknown): Promise<{ ok: true }> {
+export async function setStatus(appid: unknown, status: unknown, store?: unknown): Promise<{ ok: true }> {
   const idNum = Number(appid)
   if (!Number.isFinite(idNum)) throw new Error('invalid appid')
   if (typeof status !== 'string' || !STATUS_VALUES.includes(status as GameStatus)) {
     throw new Error('invalid status')
   }
+  // Unknown/missing store falls back to Steam (bare key) for backward compatibility.
+  const s: StoreKey = (typeof store === 'string' && store in mock.storeMeta) ? (store as StoreKey) : 'Steam'
   const cache = await readCache<StatusCache>('statuses.json', { items: {} })
-  cache.items[String(idNum)] = status as GameStatus
+  cache.items[statusKey(s, idNum)] = status as GameStatus
   await writeCache('statuses.json', cache)
   return { ok: true }
 }
@@ -259,41 +277,65 @@ async function fetchAchievements(appid: number): Promise<{ unlocked: number; tot
 
 // ---- Read-only request paths ---------------------------------------------
 export async function getLibrary(): Promise<{ source: Source; games: Game[] }> {
-  if (!configured()) return { source: 'mock', games: mock.library }
-  const games = await ownedGames()
-  const rcache = await readCache<ReviewCache>('reviews.json', emptyReviewCache())
-  const acache = await getAchievements()
-  const tcache = await readCache<TtbCache>('timetobeat.json', emptyTtbCache())
+  if (!configured() && !gog.configured()) return { source: 'mock', games: mock.library }
   const statuses = await getStatuses()
-  const withData = games.map((g) => {
-    const r = rcache.items[String(g.appid)]
-    const a = acache[String(g.appid)]
-    const t = tcache.items[String(g.appid)]
-    const status = statuses[String(g.appid)] ?? defaultStatus(g)
-    return {
-      ...g,
-      status,
-      ...(r ? { reviewPct: r.pct, reviewBand: bandFromDesc(r.desc) } : {}),
-      ...(a ? { achUnlocked: a.unlocked, achTotal: a.total } : {}),
-      ...(t?.hours != null ? { ttbHours: t.hours } : {}),
+  const out: Game[] = []
+
+  if (configured()) {
+    const games = await ownedGames()
+    const rcache = await readCache<ReviewCache>('reviews.json', emptyReviewCache())
+    const acache = await getAchievements()
+    const tcache = await readCache<TtbCache>('timetobeat.json', emptyTtbCache())
+    for (const g of games) {
+      const r = rcache.items[String(g.appid)]
+      const a = acache[String(g.appid)]
+      const t = tcache.items[String(g.appid)]
+      out.push({
+        ...g,
+        status: statuses[statusKey('Steam', g.appid)] ?? defaultStatus(g),
+        ...(r ? { reviewPct: r.pct, reviewBand: bandFromDesc(r.desc) } : {}),
+        ...(a ? { achUnlocked: a.unlocked, achTotal: a.total } : {}),
+        ...(t?.hours != null ? { ttbHours: t.hours } : {}),
+      })
     }
-  })
-  return { source: 'live', games: withData }
+  }
+
+  if (gog.configured()) {
+    const gogGames = await gog.getGames().catch(() => [] as Game[])
+    for (const g of gogGames) {
+      out.push({ ...g, status: statuses[statusKey('GOG', g.appid)] ?? defaultStatus(g) })
+    }
+  }
+
+  return { source: 'live', games: out }
 }
 
 export async function getDashboard(): Promise<DashboardPayload> {
-  if (!configured()) {
+  const steamLive = configured()
+  const gogLive = gog.configured()
+  if (!steamLive && !gogLive) {
     return {
       source: 'mock', profile: mock.profile, trending: mock.trending,
       libraryByStore: mock.libraryByStore, statusBreakdown: mock.statusBreakdown,
       reviewSentiment: mock.reviewSentiment,
     }
   }
-  const games = await ownedGames()
-  const rcache = await readCache<ReviewCache>('reviews.json', emptyReviewCache())
-  const profile = await fetchProfile(games)
 
-  // Sentiment donut + average from cached reviews of currently-owned games.
+  const games = steamLive ? await ownedGames() : []
+  const gogGames = gogLive ? await gog.getGames().catch(() => [] as Game[]) : []
+  const totalGames = games.length + gogGames.length
+  const rcache = await readCache<ReviewCache>('reviews.json', emptyReviewCache())
+
+  // Profile is Steam-derived when available (persona/avatar/playtime); otherwise
+  // a minimal GOG-only profile. The store-spanning fields are overridden below.
+  const baseProfile = steamLive
+    ? await fetchProfile(games)
+    : {
+        ...mock.profile, personaName: 'GOG User', avatar: '', totalGames: 0,
+        steamGames: 0, storesConnected: 0, playedHours: 0, backlogHours: 0, completePct: 0,
+      }
+
+  // Sentiment donut + average from cached reviews of currently-owned (Steam) games.
   const ownedSet = new Set(games.map((g) => String(g.appid)))
   const counts = new Map<string, number>()
   let pctSum = 0, pctN = 0
@@ -310,21 +352,36 @@ export async function getDashboard(): Promise<DashboardPayload> {
       }))
     : null
 
+  // Library-by-store donut, merged across configured providers.
+  const libraryByStore: { key: StoreKey; value: number; color: string }[] = []
+  if (totalGames) {
+    if (games.length) libraryByStore.push({ key: 'Steam', value: Math.round((games.length / totalGames) * 100), color: STORE_COLOR.Steam! })
+    if (gogGames.length) libraryByStore.push({ key: 'GOG', value: Math.round((gogGames.length / totalGames) * 100), color: STORE_COLOR.GOG! })
+  }
+
   return {
     source: 'live',
-    profile: { ...profile, avgReviewPct: pctN ? Math.round(pctSum / pctN) : 0 },
+    profile: {
+      ...baseProfile,
+      totalGames,
+      storesConnected: (steamLive ? 1 : 0) + (gogLive ? 1 : 0),
+      avgReviewPct: pctN ? Math.round(pctSum / pctN) : 0,
+    },
     trending: mock.trending, // no public "trending in your library" endpoint
-    libraryByStore: [{ key: 'Steam', value: 100, color: '#5ab0e8' }],
+    libraryByStore,
     statusBreakdown: games.length ? breakdown(games, (g) => g.status, (k) => STATUS_COLOR[k]) : null,
     reviewSentiment,
   }
 }
 
 export async function getWishlist(): Promise<{
-  source: Source; items: WishlistItem[]; total: number; pending: number
+  source: Source; items: WishlistItem[]; total: number; pending: number; gog: WishlistItem[]
 }> {
+  // GOG wishlist (separate tab on the frontend) — independent of Steam's warming.
+  const gogItems = gog.configured() ? await gog.getWishlist().catch(() => [] as WishlistItem[]) : []
   if (!configured()) {
-    return { source: 'mock', items: mock.wishlist, total: mock.wishlist.length, pending: 0 }
+    if (gog.configured()) return { source: 'live', items: [], total: 0, pending: 0, gog: gogItems }
+    return { source: 'mock', items: mock.wishlist, total: mock.wishlist.length, pending: 0, gog: mock.gogWishlist }
   }
   const appids = await wishlistAppids()
   const cache = await readCache<WishlistCache>('wishlist.json', emptyWishlistCache())
@@ -334,7 +391,7 @@ export async function getWishlist(): Promise<{
     const m = cache.misses?.[String(a)]; return m !== undefined && now - m < MISS_TTL
   }).length
   const pending = Math.max(0, appids.length - items.length - activeMisses)
-  return { source: 'live', items, total: appids.length, pending }
+  return { source: 'live', items, total: appids.length, pending, gog: gogItems }
 }
 
 // ---- Game detail (on-demand, for the Library detail card) -----------------
@@ -365,8 +422,11 @@ export interface GameDetail {
 const detailMem = new Map<number, { at: number; data: GameDetail }>()
 const DETAIL_TTL = 10 * 60_000
 
-export async function getGameDetail(appid: number): Promise<GameDetail> {
+export async function getGameDetail(appid: number, store?: string): Promise<GameDetail> {
   if (!Number.isFinite(appid)) throw new Error('invalid appid')
+  // GOG product ids live in their own namespace — route them to the GOG fetcher
+  // rather than Steam's storefront (which would 404 on a GOG id).
+  if (store === 'GOG') return gog.getGameDetail(appid)
   const cached = detailMem.get(appid)
   if (cached && Date.now() - cached.at < DETAIL_TTL) return cached.data
 
@@ -460,8 +520,10 @@ const IDLE_MS = 5 * 60_000        // when fully warm, re-check this often for st
 
 let warmerStarted = false
 export function startWarmer(): void {
-  if (warmerStarted || !configured()) return
+  if (warmerStarted) return
   warmerStarted = true
+  gog.startWarmer() // self-guards on GOG credentials; runs independently of Steam
+  if (!configured()) return
 
   // Two independent pacers: storefront (appdetails/appreviews, ~40/min cap) and
   // achievements (Steam Web API, generous). Decoupled so a storefront throttle

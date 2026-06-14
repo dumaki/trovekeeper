@@ -146,3 +146,11 @@ export const wishlist: WishlistItem[] = [
   { appid: 1144200, name: 'Ready or Not',             price: 35.99, origPrice: 39.99, discountPct: 10, reviewPct: 90, releasedAt: '2023-12-13', headerImage: hdr(1144200) },
   { appid: 1426210, name: 'It Takes Two',             price: 15.99, origPrice: 39.99, discountPct: 60, reviewPct: 95, releasedAt: '2021-03-26', headerImage: hdr(1426210) },
 ]
+
+// ---- GOG wishlist (separate tab) ----------------------------------------
+export const gogWishlist: WishlistItem[] = [
+  { appid: 1207659110, name: 'Disco Elysium',          price: 9.99,  origPrice: 39.99, discountPct: 75, reviewPct: 0, releasedAt: '2019-10-15', headerImage: hdr(632470) },
+  { appid: 1452598624, name: 'Cyberpunk 2077: Phantom Liberty', price: 24.99, origPrice: 29.99, discountPct: 17, reviewPct: 0, releasedAt: '2023-09-26', headerImage: hdr(2138330) },
+  { appid: 1207666393, name: 'Gwent: The Witcher Card Game', price: 0, origPrice: 0, discountPct: 0, reviewPct: 0, releasedAt: '2018-10-23', headerImage: hdr(1284410) },
+  { appid: 1895572983, name: 'Sea of Stars',           price: 27.99, origPrice: 34.99, discountPct: 20, reviewPct: 0, releasedAt: '2023-08-29', headerImage: hdr(1244090) },
+]

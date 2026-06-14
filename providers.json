@@ -20,6 +20,18 @@
       ]
     },
     {
+      "id": "gog",
+      "label": "GOG",
+      "env": [
+        {
+          "key": "GOG_REFRESH_TOKEN",
+          "required": true,
+          "secret": true,
+          "hint": "run `npm run gog-login` to obtain this — don't enter it by hand"
+        }
+      ]
+    },
+    {
       "id": "igdb",
       "label": "IGDB (time-to-beat, optional)",
       "env": [

@@ -37,6 +37,22 @@ the app runs on sample data. Run it again any time to fill in or change keys.
 
 Then `npm run setup` and paste them at the prompts (the key is never shown as you type).
 
+## Optional: IGDB for accurate backlog hours
+
+By default "years to clear" uses a flat ~8h/game estimate (HowLongToBeat has no
+usable public API). For real per-game time-to-beat, add free IGDB credentials:
+
+1. Register an app at https://dev.twitch.tv/console/apps (OAuth redirect
+   `http://localhost`, category Application Integration).
+2. Copy the **Client ID** and generate a **Client Secret**.
+3. `npm run setup` → paste them at the `IGDB_CLIENT_ID` / `IGDB_CLIENT_SECRET`
+   prompts, then restart `npm run dev`.
+
+The server maps Steam appids → IGDB games (`external_games`) → main-story
+time-to-beat (`game_time_to_beats`), cached at `.cache/timetobeat.json` and
+refreshed monthly. Backlog hours then sum real per-game lengths; unmatched
+titles fall back to the estimate. Achievements (Steam, always on) are unaffected.
+
 ## Security model
 
 Credentials are treated as radioactive. The design makes it structurally hard to

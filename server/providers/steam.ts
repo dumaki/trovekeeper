@@ -13,6 +13,7 @@ import type {
   Game, WishlistItem, GameStatus, ReviewBand, StoreKey,
 } from '../../src/data/mockData'
 import { readCache, writeCache } from '../cache'
+import { igdbConfigured, fetchTimeToBeat } from './igdb'
 
 const API = 'https://api.steampowered.com'
 const hdr = (appid: number) =>
@@ -59,6 +60,8 @@ const REVIEW_GATE = 100                     // boot gate releases after this man
 
 const ACH_TTL = 24 * 60 * 60 * 1000         // achievements change as you play -> refresh daily
 const ACH_PER_STEP = 12                      // achievements use the Web API (generous), so fetch more per tick
+const TTB_TTL = 30 * 24 * 60 * 60 * 1000     // time-to-beat barely changes -> refresh monthly
+const TTB_PER_STEP = 500                      // appids resolved per IGDB step (batched internally)
 
 interface ReviewEntry { pct: number; desc: string; reviewedAt: number }
 interface ReviewCache { items: Record<string, ReviewEntry> }
@@ -66,10 +69,13 @@ interface CachedItem extends WishlistItem { pricedAt: number; reviewedAt: number
 interface WishlistCache { items: Record<string, CachedItem>; misses: Record<string, number> }
 interface AchEntry { unlocked: number; total: number; at: number } // total 0 = game has no achievements
 interface AchCache { items: Record<string, AchEntry> }
+interface TtbEntry { hours: number | null; at: number }            // null = IGDB has no time-to-beat
+interface TtbCache { items: Record<string, TtbEntry> }
 
 const emptyWishlistCache = (): WishlistCache => ({ items: {}, misses: {} })
 const emptyReviewCache = (): ReviewCache => ({ items: {} })
 const emptyAchCache = (): AchCache => ({ items: {} })
+const emptyTtbCache = (): TtbCache => ({ items: {} })
 
 function bandFromDesc(desc: string): ReviewBand {
   if (desc.includes('Overwhelmingly Positive')) return 'Overwhelmingly Positive'
@@ -224,16 +230,19 @@ export async function getLibrary(): Promise<{ source: Source; games: Game[] }> {
   const games = await ownedGames()
   const rcache = await readCache<ReviewCache>('reviews.json', emptyReviewCache())
   const acache = await getAchievements()
+  const tcache = await readCache<TtbCache>('timetobeat.json', emptyTtbCache())
   const statuses = await getStatuses()
   const withData = games.map((g) => {
     const r = rcache.items[String(g.appid)]
     const a = acache[String(g.appid)]
+    const t = tcache.items[String(g.appid)]
     const status = statuses[String(g.appid)] ?? defaultStatus(g)
     return {
       ...g,
       status,
       ...(r ? { reviewPct: r.pct, reviewBand: bandFromDesc(r.desc) } : {}),
       ...(a ? { achUnlocked: a.unlocked, achTotal: a.total } : {}),
+      ...(t?.hours != null ? { ttbHours: t.hours } : {}),
     }
   })
   return { source: 'live', games: withData }
@@ -362,9 +371,19 @@ export function startWarmer(): void {
     } catch (e) { console.log('[warmer] achievements error:', (e as Error).message); delay = COOLDOWN_MS }
     setTimeout(achievements, delay)
   }
+  const igdb = async () => {
+    let delay = STEP_INTERVAL_MS
+    try {
+      const { throttled, remaining } = await igdbStep()
+      if (throttled) { console.log('[warmer] IGDB throttled — cooling down 5m'); delay = COOLDOWN_MS }
+      else if (remaining === 0) delay = IDLE_MS
+    } catch (e) { console.log('[warmer] IGDB error:', (e as Error).message); delay = COOLDOWN_MS }
+    setTimeout(igdb, delay)
+  }
   setTimeout(storefront, 2_000)
   setTimeout(achievements, 3_000)
-  console.log('[warmer] started — storefront + achievements pacers')
+  if (igdbConfigured()) setTimeout(igdb, 4_000)
+  console.log(`[warmer] started — storefront + achievements${igdbConfigured() ? ' + IGDB' : ''} pacers`)
 }
 
 function isThrottle(e: unknown): boolean {
@@ -473,6 +492,34 @@ async function achievementStep(): Promise<{ throttled: boolean; remaining: numbe
     if (!a || now - a.at > ACH_TTL) remaining++
   }
   return { throttled, remaining }
+}
+
+// One IGDB batch: resolve time-to-beat for un-cached/stale appids. No-op unless
+// IGDB credentials are configured. Internally batched, so a few hundred appids
+// resolve in ~2 requests.
+async function igdbStep(): Promise<{ throttled: boolean; remaining: number }> {
+  if (!igdbConfigured()) return { throttled: false, remaining: 0 }
+  const now = Date.now()
+  const games = await ownedGames()
+  const cache = await readCache<TtbCache>('timetobeat.json', emptyTtbCache())
+  const ownedSet = new Set(games.map((g) => String(g.appid)))
+  for (const k of Object.keys(cache.items)) if (!ownedSet.has(k)) delete cache.items[k]
+
+  const due = games
+    .map((g) => g.appid)
+    .filter((a) => { const c = cache.items[String(a)]; return !c || now - c.at > TTB_TTL })
+
+  if (due.length === 0) return { throttled: false, remaining: 0 }
+
+  try {
+    const map = await fetchTimeToBeat(due.slice(0, TTB_PER_STEP))
+    for (const [appid, hours] of Object.entries(map)) cache.items[appid] = { hours, at: now }
+    await writeCache('timetobeat.json', cache)
+  } catch (e) {
+    if (isThrottle(e)) return { throttled: true, remaining: due.length }
+    throw e
+  }
+  return { throttled: false, remaining: Math.max(0, due.length - TTB_PER_STEP) }
 }
 
 // Count of storefront items still needing a call (un-cached or stale).

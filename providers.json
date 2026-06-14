@@ -18,6 +18,24 @@
           "hint": "17-digit SteamID64 — look it up at https://steamid.io"
         }
       ]
+    },
+    {
+      "id": "igdb",
+      "label": "IGDB (time-to-beat, optional)",
+      "env": [
+        {
+          "key": "IGDB_CLIENT_ID",
+          "required": false,
+          "secret": false,
+          "hint": "Twitch app Client ID from https://dev.twitch.tv/console/apps"
+        },
+        {
+          "key": "IGDB_CLIENT_SECRET",
+          "required": false,
+          "secret": true,
+          "hint": "Twitch app Client Secret (New Secret) — powers accurate backlog hours"
+        }
+      ]
     }
   ]
 }

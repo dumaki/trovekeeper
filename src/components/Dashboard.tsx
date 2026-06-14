@@ -11,9 +11,13 @@ const STATUS_COLOR: Record<GameStatus, string> = {
 }
 const STATUS_ORDER: GameStatus[] = ['Backlog', 'Playing', 'Finished', 'Next', 'Skip']
 
-// Rough per-game length used only for the "years to clear" vanity estimate —
-// Steam exposes no time-to-beat data, so this is a transparent assumption.
+// Per-game length used for the "years to clear" estimate when IGDB has no
+// time-to-beat for a title.
 const ASSUMED_HOURS_PER_GAME = 8
+// Cap any single game's contribution to the backlog estimate. Endless games
+// (MMOs, idle games) report absurd main-story times (RuneScape ~5,000h) that
+// drown out the metric; 200h still respects genuinely long RPGs.
+const TTB_CAP_HOURS = 200
 
 export default function Dashboard() {
   const { dashboard, library, wishlist } = useData()
@@ -51,10 +55,11 @@ export default function Dashboard() {
     <>You've got <b>{counts.Skip}</b> games marked to skip.</>,
   ]
 
-  // ttbHours (IGDB) when available, else the flat assumption per backlog game.
+  // ttbHours (IGDB) when available, else the flat assumption per backlog game —
+  // capped so endless games don't dominate the estimate.
   const backlogHours = library
     .filter((g) => g.status === 'Backlog' || g.status === 'Next')
-    .reduce((sum, g) => sum + (g.ttbHours ?? ASSUMED_HOURS_PER_GAME), 0)
+    .reduce((sum, g) => sum + Math.min(g.ttbHours ?? ASSUMED_HOURS_PER_GAME, TTB_CAP_HOURS), 0)
   const yearsToClear = (backlogHours / (2 * 365)).toFixed(1)
   const ttbKnown = library.some((g) => g.ttbHours != null)
 

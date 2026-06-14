@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { storeMeta, type GameStatus } from '../data/mockData'
 import { useData } from '../data/DataContext'
 import HeroScene from './HeroScene'
@@ -29,6 +29,9 @@ export default function Dashboard() {
   const completePct = pct(counts.Finished)
   const dealsLive = wishlist.filter((w) => w.discountPct > 0).length
   const backlogGames = counts.Backlog + counts.Next
+  const playedCount = library.filter((g) => g.playtimeHours > 0).length
+  const playedPct = pct(playedCount)
+  const T = total.toLocaleString()
 
   // ---- achievements: real completion signal across games that have them ----
   const withAch = library.filter((g) => (g.achTotal ?? 0) > 0)
@@ -36,6 +39,17 @@ export default function Dashboard() {
   const avgCompletion = withAch.length
     ? Math.round((withAch.reduce((s, g) => s + g.achUnlocked! / g.achTotal!, 0) / withAch.length) * 100)
     : 0
+
+  // Rotating facts shown below the hero — each value is live/computed.
+  const facts: ReactNode[] = [
+    <>You own <b>{profile.totalGames.toLocaleString()} games</b>. You've played <b>{playedCount.toLocaleString()}</b> — only <b>{playedPct}%</b> of your library.</>,
+    <>You've perfected <b>{perfectGames}</b> games in your library. Keep it up!</>,
+    <>You're currently playing <b>{counts.Playing}</b> of <b>{T}</b> games in your library.</>,
+    <>You've got <b>{counts.Next}</b> of <b>{T}</b> games to play next.</>,
+    <>You've got <b>{counts.Backlog}</b> of <b>{T}</b> marked as backlog.</>,
+    <>You've finished <b>{counts.Finished}</b> of <b>{T}</b> — that's <b>{completePct}%</b> complete!</>,
+    <>You've got <b>{counts.Skip}</b> games marked to skip.</>,
+  ]
 
   // ttbHours (IGDB) when available, else the flat assumption per backlog game.
   const backlogHours = library
@@ -92,9 +106,7 @@ export default function Dashboard() {
             <Stat value={`${profile.avgReviewPct}%`} label="Avg Review" />
           </div>
 
-          <div className="trust-pill">
-            Credentials stay encrypted on your machine — fetchers use your browser session.
-          </div>
+          <CyclingFact items={facts} />
         </div>
 
         <div className="carousel-ctl">
@@ -142,6 +154,20 @@ export default function Dashboard() {
       </section>
     </div>
   )
+}
+
+// Rotates through facts, fading out the current one every 10s before the next.
+function CyclingFact({ items }: { items: ReactNode[] }) {
+  const [i, setI] = useState(0)
+  const [fading, setFading] = useState(false)
+  useEffect(() => {
+    const id = setInterval(() => {
+      setFading(true) // fade out, then swap + fade in
+      setTimeout(() => { setI((p) => (p + 1) % items.length); setFading(false) }, 500)
+    }, 10_000)
+    return () => clearInterval(id)
+  }, [items.length])
+  return <div className={`trust-pill ${fading ? 'fading' : ''}`}>{items[i % items.length]}</div>
 }
 
 function Stat({ value, label }: { value: string; label: string }) {

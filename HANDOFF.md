@@ -9,13 +9,14 @@ tabs: **Dashboard**, **Library**, **Wishlist** (Wishlist has per-store sub-tabs)
 
 - **Repo:** https://github.com/dumaki/trovekeeper  (`main` is current & green)
 - **Local path:** `/Users/benhughes/Documents/Claude/TroveKeeper`
-- **Seven stores connected & live-verified** in the owner's `.env`: **Steam**
+- **Eight stores connected & live-verified** in the owner's `.env`: **Steam**
   (~1,112 games), **GOG**, **Epic**, **PSN**, **Xbox**, **Nintendo** (eShop),
-  **itch.io** — plus **IGDB** for time-to-beat. Each non-Steam store is its own
-  provider merged into the library, dashboard donut, and the quick-strip marquee
-  chips. Store chips render real **brand logos** (`src/data/storeIcons.ts`).
-- **Store target is 10** (`storesTotal`): the 7 above + 3 remaining — **Ubisoft**
-  (next), **EA**, **Amazon**. Humble Bundle (keys already redeemed on Steam) and
+  **itch.io**, **Ubisoft** (Connect) — plus **IGDB** for time-to-beat. Each
+  non-Steam store is its own provider merged into the library, dashboard donut,
+  and the quick-strip marquee chips. Store chips render real **brand logos**
+  (`src/data/storeIcons.ts`).
+- **Store target is 10** (`storesTotal`): the 8 above + 2 remaining — **EA**
+  (next), **Amazon**. Humble Bundle (keys already redeemed on Steam) and
   Battle.net (no owned-games API) were intentionally dropped.
 
 ## Run / verify
@@ -32,6 +33,7 @@ npm run psn-login # one-time PSN: writes PSN_NPSSO (npsso cookie) to .env
 npm run xbox-login # one-time Xbox: Microsoft OAuth -> XBOX_REFRESH_TOKEN in .env
 npm run nintendo-login # paste ec.nintendo.com session cookie (~30d) -> NINTENDO_COOKIE
 npm run itch-login # paste itch.io API key -> ITCH_API_KEY (verified against /profile)
+npm run ubisoft-login # paste ubisoft.com rememberMeTicket -> UBISOFT_REMEMBER_TOKEN
 ```
 Owner usually runs their **own** `npm run dev` in a terminal. The Claude preview
 tool can't attach to it (it owns :5173/:8787), so to screenshot you must
@@ -93,7 +95,7 @@ when you don't need a visual.
   the count; the 1130→1112 drop was ads/mods/DLC/demos/betas).
 
 ## Features built (all on `main`)
-**Seven-store library** (Steam/GOG/Epic/PSN/Xbox/Nintendo/itch.io merged) ·
+**Eight-store library** (Steam/GOG/Epic/PSN/Xbox/Nintendo/itch.io/Ubisoft merged) ·
 **real brand-logo store chips** · editable per-game
 **status** (dropdown on cards, persisted, played→Playing default) · **dashboard
 stats** computed from real data (deals-live, %complete, backlog hours, status
@@ -124,6 +126,8 @@ mock flash · server type-checking.
 - `server/providers/nintendo.ts` — eShop session-cookie → `/api/auth/session`
   id_token → savanna GraphQL purchase history. Dormant wishlist. Merged into steam.ts.
 - `server/providers/itch.ts` — itch.io API-key owned-keys library. Merged into steam.ts.
+- `server/providers/ubisoft.ts` — rememberMeTicket→ticket refresh; gamesplayed +
+  catalog + stats(playtime). Merged into steam.ts.
 - `server/providers/igdb.ts` — Twitch auth + batched time-to-beat.
 - `src/data/storeIcons.ts` — brand-logo SVG paths (simple-icons) for the store chips.
 - `src/components/Dashboard.tsx` — all dashboard math (computes from library +
@@ -226,17 +230,24 @@ Hard-won conventions:
   (paged), owned games + cover art + short_text; non-game `classification`
   filtered. No playtime/achievements/wishlist. itch ids hashed into appid
   (2.7B range) like Epic/Xbox/Nintendo.
+- **Ubisoft** ✅ library + playtime (`ubisoft-login`). Raw email/password auth is
+  429-blocked, so the durable credential is the browser **`rememberMeTicket`**
+  (grabbed from ubisoft.com local storage); the server refreshes it into 15-min
+  `Ubi_v1` tickets via `POST /v3/profiles/sessions` with `Authorization: rm_v1
+  t=<rememberMeTicket>` (rotates — persist the new one). Library assembled from 3
+  `public-ubiservices.ubi.com` calls: `gamesplayed` (played spaceIds + last-
+  played) → `catalog` (spaceId→name+art, siblingGames dedup cross-platform) →
+  `stats?statNames=Playtime` (seconds→hours, queried per *played* spaceId).
+  Playtime is sparse (Ubisoft only records it for some titles); last-played is
+  universal. No achievements on this surface. spaceId hashed into appid (2.9B).
 
 ## Open follow-ups / next up
-1. **Ubisoft (next store)** — richest of the remaining: owned + **playtime** +
-   achievements/Units via `public-ubiservices.ubi.com` (Ubi-AppId headers). Auth =
-   capture the auth ticket from connect.ubisoft.com DevTools, refresh server-side.
-   ~1 session.
-2. **EA** then **Amazon** after Ubisoft. EA (`accounts.ea.com` OAuth → token;
-   owned + playtime + achievements — rich, but fiddly auth). Amazon (Login-with-
-   Amazon device OAuth like Nile/Heroic; owned + art only — sparse). Both
-   DevTools-capturable. **Humble Bundle + Battle.net dropped** (Humble keys all
-   redeemed on Steam already; Battle.net has no owned-games API).
+1. **EA (next store)** — `accounts.ea.com` OAuth → access token; owned + playtime
+   + achievements (rich, but fiddly auth). DevTools-capturable.
+2. **Amazon** after EA — Login-with-Amazon device OAuth like Nile/Heroic; owned +
+   art only (sparse). **Humble Bundle + Battle.net dropped** (Humble keys all
+   redeemed on Steam already; Battle.net has no owned-games API). Optional Ubisoft
+   follow-up: **achievements/Units** (a separate club endpoint, not yet wired).
 3. **Nintendo wishlist** — dormant; needs a nintendo.com wishlist XHR capture
    (see the Nintendo "Wishlist: TODO" note). Same for **PSN + Xbox wishlist**.
 4. **Community store tags** — would need scraping the Steam store page (not in API).

@@ -187,14 +187,37 @@ b { font-weight: 700; color: var(--text); }
 .trending-card h2 { font-size: 24px; font-weight: 800; margin: 4px 0; }
 .trending-meta { font-size: 13px; color: var(--muted); }
 
-/* ---------- Quick strip ---------- */
+/* ---------- Quick strip (scrolling marquee) ---------- */
 .quick-strip {
-  display: flex; flex-wrap: wrap; gap: 26px;
-  padding: 16px 22px;
+  padding: 16px 0;
   background: var(--panel); border: 1px solid var(--border);
   border-radius: var(--radius);
+  overflow: hidden;
 }
-.quick-item { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+/* Clip the scroll and fade it out at both edges. */
+.quick-marquee {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+}
+/* Two identical groups sit side by side; translating by exactly one group width
+   (-50% of the track) lands the copy where the original was — a seamless loop. */
+.quick-track {
+  display: flex; width: max-content;
+  animation: quick-scroll 32s linear infinite;
+}
+.quick-strip:hover .quick-track { animation-play-state: paused; }
+/* margin-right == gap keeps spacing uniform across the A→B seam, so translating
+   one whole group (-50% of the two-group track) is visually continuous. */
+.quick-group { display: flex; gap: 26px; margin-right: 26px; }
+@keyframes quick-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .quick-track { animation: none; }
+}
+.quick-item { display: flex; align-items: center; gap: 8px; font-size: 13.5px; white-space: nowrap; }
 .quick-badge {
   width: 24px; height: 24px; border-radius: 999px;
   border: 1.5px solid; display: grid; place-items: center;
@@ -286,6 +309,26 @@ b { font-weight: 700; color: var(--text); }
 .ach-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #b8860b, #f5c518); }
 .ach-text { font-size: 11.5px; font-weight: 700; color: #e7c66b; white-space: nowrap; }
 .empty { color: var(--muted); padding: 40px; text-align: center; grid-column: 1 / -1; }
+
+/* ---------- Wishlist store tabs ---------- */
+.wish-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
+.wish-tab {
+  appearance: none; background: none; border: none; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; margin-bottom: -1px;
+  font-size: 14px; font-weight: 600; color: var(--muted);
+  border-bottom: 2px solid transparent;
+}
+.wish-tab:hover { color: var(--text); }
+.wish-tab.on { color: var(--text); border-bottom-color: var(--accent); }
+.wish-tab-badge {
+  width: 20px; height: 20px; border-radius: 999px; color: #fff;
+  display: grid; place-items: center; font-size: 11px; font-weight: 800;
+}
+.wish-tab .count {
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  background: var(--panel-2); border-radius: 999px; padding: 1px 8px;
+}
 
 /* ---------- Wishlist rows ---------- */
 .wish-list { display: flex; flex-direction: column; gap: 12px; }

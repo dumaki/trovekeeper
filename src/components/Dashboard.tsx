@@ -33,6 +33,7 @@ export default function Dashboard() {
   const completePct = pct(counts.Finished)
   const dealsLive = wishlist.filter((w) => w.discountPct > 0).length
   const backlogGames = counts.Backlog + counts.Next
+  const gogGames = library.filter((g) => g.store === 'GOG').length
   const playedCount = library.filter((g) => g.playtimeHours > 0).length
   const playedPct = pct(playedCount)
   const T = total.toLocaleString()
@@ -52,7 +53,7 @@ export default function Dashboard() {
     <>You've got <b>{counts.Next}</b> of <b>{T}</b> games to play next.</>,
     <>You've got <b>{counts.Backlog}</b> of <b>{T}</b> marked as backlog.</>,
     <>You've finished <b>{counts.Finished}</b> of <b>{T}</b> — that's <b>{completePct}%</b> complete!</>,
-    <>You've got <b>{counts.Skip}</b> games marked to skip.</>,
+    <>You've got <b>{counts.Skip}</b> out of <b>{T}</b> games marked as skipped.</>,
   ]
 
   // ttbHours (IGDB) when available, else the flat assumption per backlog game —
@@ -66,6 +67,17 @@ export default function Dashboard() {
   const statusBreakdown = STATUS_ORDER
     .filter((s) => counts[s] > 0)
     .map((s) => ({ key: s, value: pct(counts[s]), color: STATUS_COLOR[s] }))
+
+  // Quick-strip items, rendered as a scrolling marquee. GOG only appears once
+  // that store is connected (so there's never an empty "GOG 0" chip).
+  const quickItems: { badge: string; tone: string; label: string; sub: string }[] = [
+    { badge: 'P', tone: STATUS_COLOR.Playing, label: `Playing ${counts.Playing}`, sub: 'in progress' },
+    { badge: 'F', tone: STATUS_COLOR.Finished, label: `Finished ${counts.Finished}`, sub: 'completed' },
+    { badge: '🏆', tone: '#f5c518', label: `${perfectGames} perfect`, sub: `${avgCompletion}% avg completion` },
+    { badge: 'W', tone: '#f5c518', label: `Wishlist ${dealsLive}`, sub: 'deals live now' },
+    { badge: 'S', tone: '#5ab0e8', label: `Steam ${profile.steamGames.toLocaleString()}`, sub: 'games' },
+    ...(gogGames > 0 ? [{ badge: 'G', tone: '#7b3ff2', label: `GOG ${gogGames.toLocaleString()}`, sub: 'games' }] : []),
+  ]
 
   const [t, setT] = useState(0)
   const cur = trending[t % trending.length]
@@ -128,13 +140,20 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* ---- QUICK STRIP (computed from real status counts) ---- */}
+      {/* ---- QUICK STRIP (scrolling marquee; pauses on hover) ---- */}
       <section className="quick-strip">
-        <Quick badge="P" tone={STATUS_COLOR.Playing} label={`Playing ${counts.Playing}`} sub="in progress" />
-        <Quick badge="F" tone={STATUS_COLOR.Finished} label={`Finished ${counts.Finished}`} sub="completed" />
-        <Quick badge="🏆" tone="#f5c518" label={`${perfectGames} perfect`} sub={`${avgCompletion}% avg completion`} />
-        <Quick badge="W" tone="#f5c518" label={`Wishlist ${dealsLive}`} sub="deals live now" />
-        <Quick badge="S" tone="#5ab0e8" label={`Steam ${profile.steamGames.toLocaleString()}`} sub="games" />
+        <div className="quick-marquee">
+          {/* The track holds two identical groups so the loop is seamless; the
+              second is aria-hidden so screen readers don't read it twice. */}
+          <div className="quick-track">
+            <div className="quick-group">
+              {quickItems.map((q, i) => <Quick key={i} {...q} />)}
+            </div>
+            <div className="quick-group" aria-hidden="true">
+              {quickItems.map((q, i) => <Quick key={i} {...q} />)}
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* ---- DONUTS ---- */}

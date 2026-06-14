@@ -44,6 +44,18 @@
       ]
     },
     {
+      "id": "psn",
+      "label": "PlayStation",
+      "env": [
+        {
+          "key": "PSN_NPSSO",
+          "required": true,
+          "secret": true,
+          "hint": "run `npm run psn-login` — or paste the npsso from https://ca.account.sony.com/api/v1/ssocookie"
+        }
+      ]
+    },
+    {
       "id": "igdb",
       "label": "IGDB (time-to-beat, optional)",
       "env": [

@@ -89,14 +89,16 @@ export default function GameModal({ game, onClose }: { game: Game; onClose: () =
           {detail?.shortDescription && <p className="modal-desc">{detail.shortDescription}</p>}
 
           <div className="modal-ach">
-            <h3>Achievements {achievements.length > 0 && <span className="muted">{unlocked} / {achievements.length}</span>}</h3>
+            <h3>{game.store === 'PSN' ? 'Trophies' : 'Achievements'} {achievements.length > 0 && <span className="muted">{unlocked} / {achievements.length}</span>}</h3>
             {loading ? (
               <p className="muted">Loading…</p>
             ) : achievements.length === 0 ? (
               <p className="muted">
                 {game.store === 'Steam'
                   ? 'This game has no Steam achievements.'
-                  : `Achievements aren't available for ${game.store} titles.`}
+                  : game.store === 'PSN'
+                    ? 'No trophy data for this game.'
+                    : `Achievements aren't available for ${game.store} titles.`}
               </p>
             ) : (
               <div className="ach-list">

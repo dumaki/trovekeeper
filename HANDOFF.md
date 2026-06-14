@@ -21,6 +21,7 @@ npm run doctor    # redacted config diagnostic (safe to share)
 npm run whoami    # resolve your SteamID64 from a vanity name
 npm run gog-login # one-time GOG OAuth: writes GOG_REFRESH_TOKEN to .env
 npm run epic-login # one-time Epic OAuth: writes EPIC_REFRESH_TOKEN to .env
+npm run psn-login # one-time PSN: writes PSN_NPSSO (npsso cookie) to .env
 ```
 Owner usually runs their **own** `npm run dev` in a terminal. The Claude preview
 tool can't attach to it (it owns :5173/:8787), so to screenshot you must
@@ -93,6 +94,8 @@ achievements) · loader instead of mock flash · server type-checking.
   (paged getFilteredProducts) + GOG game detail. Merged into steam.ts.
 - `server/providers/epic.ts` — Epic launcher OAuth + owned-library (assets +
   catalog bulk) + wishlist (store GraphQL) + game detail. Merged into steam.ts.
+- `server/providers/psn.ts` — PSN npsso→OAuth + played games (with playtime) +
+  trophies (card counts + detail trophy list). Merged into steam.ts. No wishlist.
 - `server/providers/igdb.ts` — Twitch auth + batched time-to-beat.
 - `src/components/Dashboard.tsx` — all dashboard math (computes from library +
   wishlist in context); `ASSUMED_HOURS_PER_GAME`, `TTB_CAP_HOURS`, cycling facts.
@@ -136,7 +139,23 @@ achievements) · loader instead of mock flash · server type-checking.
    `/api/status` now thread it (`statusKey('Epic', appid, storeId)`). Epic has no
    playtime/review-%/achievements. ⚠ Not verified against a live Epic account yet;
    wishlist is best-effort and fails soft (empty tab) if Epic's GraphQL shifts.
-   **Other stores** (PSN, Xbox…) follow the same provider shape — add to
+   **PSN — DONE (library + trophies); wishlist PENDING capture.**
+   `server/providers/psn.ts`. Auth: `npm run psn-login` writes the `npsso` cookie
+   to `PSN_NPSSO`; the server exchanges npsso→code→tokens and refreshes (refresh
+   token cached to `.cache/psn_auth.json`). Library = `gamelist/v2/users/me/titles`
+   (PLAYED games — note: not full purchase history — but WITH playtime + last
+   played, so PSN cards are richer than GOG/Epic). Trophies map onto the
+   achievement UI: per-card earned/total via the titleId→npCommunicationId bridge
+   (`trophy/v1/users/me/titles/trophyTitles`), and the detail modal merges defined
+   + earned trophies (`npServiceName=trophy` for PS4/older, `trophy2` for PS5).
+   PSN ids are non-numeric titleIds (`CUSA…`/`PPSA…`) → carried in `storeId`.
+   ⚠ Not verified against a live PSN account yet. **PSN wishlist is NOT exposed**
+   via the npsso/OAuth surface — it lives behind the store GraphQL
+   (`web.np.playstation.com/api/graphql/v1/op`) as an undocumented persisted query.
+   The owner opted to capture the operationName + sha256Hash (+ store session) from
+   browser DevTools; that wiring is the next PSN step (prices via
+   `metGetPricingDataByConceptId`, hash `abcb311e…`).
+   **Other stores** (Xbox…) follow the same provider shape — add to
    `providers.json`, write a `providers/<x>.ts`, merge in steam.ts's
    getLibrary/getDashboard/getWishlist.
 2. **Community store tags** — would need scraping the store page (not in API).

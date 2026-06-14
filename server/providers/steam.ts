@@ -19,6 +19,7 @@ import { readCache, writeCache } from '../cache'
 import { igdbConfigured, fetchTimeToBeat } from './igdb'
 import * as gog from './gog'
 import * as epic from './epic'
+import * as psn from './psn'
 
 const API = 'https://api.steampowered.com'
 const hdr = (appid: number) =>
@@ -46,7 +47,7 @@ const STATUS_COLOR: Record<GameStatus, string> = {
 
 // Per-store donut colors for the "Library by Store" chart (merged across providers).
 const STORE_COLOR: Partial<Record<StoreKey, string>> = {
-  Steam: '#5ab0e8', GOG: '#7b3ff2', Epic: '#c9d1da',
+  Steam: '#5ab0e8', GOG: '#7b3ff2', Epic: '#c9d1da', PSN: '#2f6bd8',
 }
 
 // Play-status is app-side state keyed per game. Steam keys stay bare (the appid)
@@ -281,7 +282,9 @@ async function fetchAchievements(appid: number): Promise<{ unlocked: number; tot
 
 // ---- Read-only request paths ---------------------------------------------
 export async function getLibrary(): Promise<{ source: Source; games: Game[] }> {
-  if (!configured() && !gog.configured() && !epic.configured()) return { source: 'mock', games: mock.library }
+  if (!configured() && !gog.configured() && !epic.configured() && !psn.configured()) {
+    return { source: 'mock', games: mock.library }
+  }
   const statuses = await getStatuses()
   const out: Game[] = []
 
@@ -318,6 +321,13 @@ export async function getLibrary(): Promise<{ source: Source; games: Game[] }> {
     }
   }
 
+  if (psn.configured()) {
+    const psnGames = await psn.getGames().catch(() => [] as Game[])
+    for (const g of psnGames) {
+      out.push({ ...g, status: statuses[statusKey('PSN', g.appid, g.storeId)] ?? defaultStatus(g) })
+    }
+  }
+
   return { source: 'live', games: out }
 }
 
@@ -325,7 +335,8 @@ export async function getDashboard(): Promise<DashboardPayload> {
   const steamLive = configured()
   const gogLive = gog.configured()
   const epicLive = epic.configured()
-  if (!steamLive && !gogLive && !epicLive) {
+  const psnLive = psn.configured()
+  if (!steamLive && !gogLive && !epicLive && !psnLive) {
     return {
       source: 'mock', profile: mock.profile, trending: mock.trending,
       libraryByStore: mock.libraryByStore, statusBreakdown: mock.statusBreakdown,
@@ -336,7 +347,8 @@ export async function getDashboard(): Promise<DashboardPayload> {
   const games = steamLive ? await ownedGames() : []
   const gogGames = gogLive ? await gog.getGames().catch(() => [] as Game[]) : []
   const epicGames = epicLive ? await epic.getGames().catch(() => [] as Game[]) : []
-  const totalGames = games.length + gogGames.length + epicGames.length
+  const psnGames = psnLive ? await psn.getGames().catch(() => [] as Game[]) : []
+  const totalGames = games.length + gogGames.length + epicGames.length + psnGames.length
   const rcache = await readCache<ReviewCache>('reviews.json', emptyReviewCache())
 
   // Profile is Steam-derived when available (persona/avatar/playtime); otherwise
@@ -371,6 +383,7 @@ export async function getDashboard(): Promise<DashboardPayload> {
     if (games.length) libraryByStore.push({ key: 'Steam', value: Math.round((games.length / totalGames) * 100), color: STORE_COLOR.Steam! })
     if (gogGames.length) libraryByStore.push({ key: 'GOG', value: Math.round((gogGames.length / totalGames) * 100), color: STORE_COLOR.GOG! })
     if (epicGames.length) libraryByStore.push({ key: 'Epic', value: Math.round((epicGames.length / totalGames) * 100), color: STORE_COLOR.Epic! })
+    if (psnGames.length) libraryByStore.push({ key: 'PSN', value: Math.round((psnGames.length / totalGames) * 100), color: STORE_COLOR.PSN! })
   }
 
   return {
@@ -378,7 +391,7 @@ export async function getDashboard(): Promise<DashboardPayload> {
     profile: {
       ...baseProfile,
       totalGames,
-      storesConnected: (steamLive ? 1 : 0) + (gogLive ? 1 : 0) + (epicLive ? 1 : 0),
+      storesConnected: (steamLive ? 1 : 0) + (gogLive ? 1 : 0) + (epicLive ? 1 : 0) + (psnLive ? 1 : 0),
       avgReviewPct: pctN ? Math.round(pctSum / pctN) : 0,
     },
     trending: mock.trending, // no public "trending in your library" endpoint
@@ -445,6 +458,7 @@ export async function getGameDetail(appid: number, store?: string, storeId?: str
   // provider rather than Steam's storefront (which would 404 on a foreign id).
   if (store === 'GOG') return gog.getGameDetail(appid)
   if (store === 'Epic') return epic.getGameDetail(storeId ?? String(appid))
+  if (store === 'PSN') return psn.getGameDetail(storeId ?? String(appid))
   if (!Number.isFinite(appid)) throw new Error('invalid appid')
   const cached = detailMem.get(appid)
   if (cached && Date.now() - cached.at < DETAIL_TTL) return cached.data
@@ -543,6 +557,7 @@ export function startWarmer(): void {
   warmerStarted = true
   gog.startWarmer() // self-guards on GOG credentials; runs independently of Steam
   epic.startWarmer() // self-guards on Epic credentials
+  psn.startWarmer() // self-guards on PSN credentials
   if (!configured()) return
 
   // Two independent pacers: storefront (appdetails/appreviews, ~40/min cap) and

@@ -68,6 +68,36 @@
       ]
     },
     {
+      "id": "nintendo",
+      "label": "Nintendo",
+      "env": [
+        {
+          "key": "NINTENDO_COOKIE",
+          "required": true,
+          "secret": true,
+          "hint": "run `npm run nintendo-login` — ec.nintendo.com session cookie (~30 days) for eShop purchase history"
+        },
+        {
+          "key": "NINTENDO_STORE_COOKIE",
+          "required": false,
+          "secret": true,
+          "hint": "separate nintendo.com Store cookie for the wishlist (captured by `npm run nintendo-login`)"
+        }
+      ]
+    },
+    {
+      "id": "itch",
+      "label": "itch.io",
+      "env": [
+        {
+          "key": "ITCH_API_KEY",
+          "required": true,
+          "secret": true,
+          "hint": "run `npm run itch-login` — personal API key from https://itch.io/user/settings/api-keys"
+        }
+      ]
+    },
+    {
       "id": "igdb",
       "label": "IGDB (time-to-beat, optional)",
       "env": [

@@ -21,6 +21,8 @@ import * as gog from './gog'
 import * as epic from './epic'
 import * as psn from './psn'
 import * as xbox from './xbox'
+import * as nintendo from './nintendo'
+import * as itch from './itch'
 
 const API = 'https://api.steampowered.com'
 const hdr = (appid: number) =>
@@ -48,7 +50,7 @@ const STATUS_COLOR: Record<GameStatus, string> = {
 
 // Per-store donut colors for the "Library by Store" chart (merged across providers).
 const STORE_COLOR: Partial<Record<StoreKey, string>> = {
-  Steam: '#5ab0e8', GOG: '#7b3ff2', Epic: '#c9d1da', PSN: '#2f6bd8', Xbox: '#16a34a',
+  Steam: '#5ab0e8', GOG: '#7b3ff2', Epic: '#c9d1da', PSN: '#2f6bd8', Xbox: '#16a34a', Nintendo: '#e60012', 'itch.io': '#fa5c5c',
 }
 
 // Play-status is app-side state keyed per game. Steam keys stay bare (the appid)
@@ -336,6 +338,20 @@ export async function getLibrary(): Promise<{ source: Source; games: Game[] }> {
     }
   }
 
+  if (nintendo.configured()) {
+    const nintendoGames = await nintendo.getGames().catch(() => [] as Game[])
+    for (const g of nintendoGames) {
+      out.push({ ...g, status: statuses[statusKey('Nintendo', g.appid, g.storeId)] ?? defaultStatus(g) })
+    }
+  }
+
+  if (itch.configured()) {
+    const itchGames = await itch.getGames().catch(() => [] as Game[])
+    for (const g of itchGames) {
+      out.push({ ...g, status: statuses[statusKey('itch.io', g.appid, g.storeId)] ?? defaultStatus(g) })
+    }
+  }
+
   return { source: 'live', games: out }
 }
 
@@ -345,7 +361,9 @@ export async function getDashboard(): Promise<DashboardPayload> {
   const epicLive = epic.configured()
   const psnLive = psn.configured()
   const xboxLive = xbox.configured()
-  if (!steamLive && !gogLive && !epicLive && !psnLive && !xboxLive) {
+  const nintendoLive = nintendo.configured()
+  const itchLive = itch.configured()
+  if (!steamLive && !gogLive && !epicLive && !psnLive && !xboxLive && !nintendoLive && !itchLive) {
     return {
       source: 'mock', profile: mock.profile, trending: mock.trending,
       libraryByStore: mock.libraryByStore, statusBreakdown: mock.statusBreakdown,
@@ -358,7 +376,9 @@ export async function getDashboard(): Promise<DashboardPayload> {
   const epicGames = epicLive ? await epic.getGames().catch(() => [] as Game[]) : []
   const psnGames = psnLive ? await psn.getGames().catch(() => [] as Game[]) : []
   const xboxGames = xboxLive ? await xbox.getGames().catch(() => [] as Game[]) : []
-  const totalGames = games.length + gogGames.length + epicGames.length + psnGames.length + xboxGames.length
+  const nintendoGames = nintendoLive ? await nintendo.getGames().catch(() => [] as Game[]) : []
+  const itchGames = itchLive ? await itch.getGames().catch(() => [] as Game[]) : []
+  const totalGames = games.length + gogGames.length + epicGames.length + psnGames.length + xboxGames.length + nintendoGames.length + itchGames.length
   const rcache = await readCache<ReviewCache>('reviews.json', emptyReviewCache())
 
   // Profile is Steam-derived when available (persona/avatar/playtime); otherwise
@@ -395,6 +415,8 @@ export async function getDashboard(): Promise<DashboardPayload> {
     if (epicGames.length) libraryByStore.push({ key: 'Epic', value: Math.round((epicGames.length / totalGames) * 100), color: STORE_COLOR.Epic! })
     if (psnGames.length) libraryByStore.push({ key: 'PSN', value: Math.round((psnGames.length / totalGames) * 100), color: STORE_COLOR.PSN! })
     if (xboxGames.length) libraryByStore.push({ key: 'Xbox', value: Math.round((xboxGames.length / totalGames) * 100), color: STORE_COLOR.Xbox! })
+    if (nintendoGames.length) libraryByStore.push({ key: 'Nintendo', value: Math.round((nintendoGames.length / totalGames) * 100), color: STORE_COLOR.Nintendo! })
+    if (itchGames.length) libraryByStore.push({ key: 'itch.io', value: Math.round((itchGames.length / totalGames) * 100), color: STORE_COLOR['itch.io']! })
   }
 
   return {
@@ -402,7 +424,7 @@ export async function getDashboard(): Promise<DashboardPayload> {
     profile: {
       ...baseProfile,
       totalGames,
-      storesConnected: (steamLive ? 1 : 0) + (gogLive ? 1 : 0) + (epicLive ? 1 : 0) + (psnLive ? 1 : 0) + (xboxLive ? 1 : 0),
+      storesConnected: (steamLive ? 1 : 0) + (gogLive ? 1 : 0) + (epicLive ? 1 : 0) + (psnLive ? 1 : 0) + (xboxLive ? 1 : 0) + (nintendoLive ? 1 : 0) + (itchLive ? 1 : 0),
       avgReviewPct: pctN ? Math.round(pctSum / pctN) : 0,
     },
     trending: mock.trending, // no public "trending in your library" endpoint
@@ -414,16 +436,17 @@ export async function getDashboard(): Promise<DashboardPayload> {
 
 export async function getWishlist(): Promise<{
   source: Source; items: WishlistItem[]; total: number; pending: number
-  gog: WishlistItem[]; epic: WishlistItem[]
+  gog: WishlistItem[]; epic: WishlistItem[]; nintendo: WishlistItem[]
 }> {
-  // GOG/Epic wishlists (separate tabs on the frontend) — independent of Steam's warming.
+  // GOG/Epic/Nintendo wishlists (separate tabs on the frontend) — independent of Steam's warming.
   const gogItems = gog.configured() ? await gog.getWishlist().catch(() => [] as WishlistItem[]) : []
   const epicItems = epic.configured() ? await epic.getWishlist().catch(() => [] as WishlistItem[]) : []
+  const nintendoItems = nintendo.configured() ? await nintendo.getWishlist().catch(() => [] as WishlistItem[]) : []
   if (!configured()) {
-    if (gog.configured() || epic.configured()) {
-      return { source: 'live', items: [], total: 0, pending: 0, gog: gogItems, epic: epicItems }
+    if (gog.configured() || epic.configured() || nintendo.configured()) {
+      return { source: 'live', items: [], total: 0, pending: 0, gog: gogItems, epic: epicItems, nintendo: nintendoItems }
     }
-    return { source: 'mock', items: mock.wishlist, total: mock.wishlist.length, pending: 0, gog: mock.gogWishlist, epic: mock.epicWishlist }
+    return { source: 'mock', items: mock.wishlist, total: mock.wishlist.length, pending: 0, gog: mock.gogWishlist, epic: mock.epicWishlist, nintendo: [] }
   }
   const appids = await wishlistAppids()
   const cache = await readCache<WishlistCache>('wishlist.json', emptyWishlistCache())
@@ -433,7 +456,7 @@ export async function getWishlist(): Promise<{
     const m = cache.misses?.[String(a)]; return m !== undefined && now - m < MISS_TTL
   }).length
   const pending = Math.max(0, appids.length - items.length - activeMisses)
-  return { source: 'live', items, total: appids.length, pending, gog: gogItems, epic: epicItems }
+  return { source: 'live', items, total: appids.length, pending, gog: gogItems, epic: epicItems, nintendo: nintendoItems }
 }
 
 // ---- Game detail (on-demand, for the Library detail card) -----------------
@@ -473,6 +496,8 @@ export async function getGameDetail(appid: number, store?: string, storeId?: str
   if (store === 'Epic') return epic.getGameDetail(appid, storeId)
   if (store === 'PSN') return psn.getGameDetail(appid, storeId)
   if (store === 'Xbox') return xbox.getGameDetail(appid, storeId)
+  if (store === 'Nintendo') return nintendo.getGameDetail(appid, storeId)
+  if (store === 'itch.io') return itch.getGameDetail(appid, storeId)
   if (!Number.isFinite(appid)) throw new Error('invalid appid')
   const cached = detailMem.get(appid)
   if (cached && Date.now() - cached.at < DETAIL_TTL) return cached.data
@@ -573,6 +598,8 @@ export function startWarmer(): void {
   epic.startWarmer() // self-guards on Epic credentials
   psn.startWarmer() // self-guards on PSN credentials
   xbox.startWarmer() // self-guards on Xbox credentials
+  nintendo.startWarmer() // self-guards on Nintendo credentials
+  itch.startWarmer() // self-guards on itch credentials
   if (!configured()) return
 
   // Two independent pacers: storefront (appdetails/appreviews, ~40/min cap) and

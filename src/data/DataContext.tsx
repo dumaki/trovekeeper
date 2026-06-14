@@ -27,6 +27,7 @@ interface DataState {
   wishlistPending: number // items not yet enriched this session
   gogWishlist: WishlistItem[] // GOG wishlist (separate tab)
   epicWishlist: WishlistItem[] // Epic wishlist (separate tab)
+  nintendoWishlist: WishlistItem[] // Nintendo Store wishlist (separate tab)
 }
 
 const MOCK: DataState = {
@@ -44,6 +45,7 @@ const MOCK: DataState = {
   wishlistPending: 0,
   gogWishlist: mock.gogWishlist,
   epicWishlist: mock.epicWishlist,
+  nintendoWishlist: [],
 }
 
 interface DataContextValue extends DataState {
@@ -71,7 +73,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const [dash, lib, wish] = await Promise.all([
           getJson<Dashboard & { source: string }>('/api/dashboard'),
           getJson<{ source: string; games: Game[] }>('/api/library'),
-          getJson<{ source: string; items: WishlistItem[]; total: number; pending: number; gog?: WishlistItem[]; epic?: WishlistItem[] }>('/api/wishlist'),
+          getJson<{ source: string; items: WishlistItem[]; total: number; pending: number; gog?: WishlistItem[]; epic?: WishlistItem[]; nintendo?: WishlistItem[] }>('/api/wishlist'),
         ])
         if (cancelled) return
         setState({
@@ -89,6 +91,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           wishlistPending: wish.pending ?? 0,
           gogWishlist: wish.gog ?? [],
           epicWishlist: wish.epic ?? [],
+          nintendoWishlist: wish.nintendo ?? [],
         })
       } catch {
         // Backend unreachable (e.g. running `vite` alone) — use bundled mock.

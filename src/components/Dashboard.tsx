@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { storeMeta, type GameStatus } from '../data/mockData'
+import { storeMeta, type GameStatus, type StoreKey } from '../data/mockData'
+import { storeIconPaths } from '../data/storeIcons'
 import { useData } from '../data/DataContext'
 import HeroScene from './HeroScene'
 import Donut from './Donut'
@@ -37,6 +38,8 @@ export default function Dashboard() {
   const epicGames = library.filter((g) => g.store === 'Epic').length
   const psnGames = library.filter((g) => g.store === 'PSN').length
   const xboxGames = library.filter((g) => g.store === 'Xbox').length
+  const nintendoGames = library.filter((g) => g.store === 'Nintendo').length
+  const itchGames = library.filter((g) => g.store === 'itch.io').length
   const playedCount = library.filter((g) => g.playtimeHours > 0).length
   const playedPct = pct(playedCount)
   const T = total.toLocaleString()
@@ -73,16 +76,18 @@ export default function Dashboard() {
 
   // Quick-strip items, rendered as a scrolling marquee. GOG only appears once
   // that store is connected (so there's never an empty "GOG 0" chip).
-  const quickItems: { badge: string; tone: string; label: string; sub: string }[] = [
+  const quickItems: { badge?: string; store?: StoreKey; tone: string; label: string; sub: string }[] = [
     { badge: 'P', tone: STATUS_COLOR.Playing, label: `Playing ${counts.Playing}`, sub: 'in progress' },
     { badge: 'F', tone: STATUS_COLOR.Finished, label: `Finished ${counts.Finished}`, sub: 'completed' },
     { badge: '🏆', tone: '#f5c518', label: `${perfectGames} perfect`, sub: `${avgCompletion}% avg completion` },
     { badge: 'W', tone: '#f5c518', label: `Wishlist ${dealsLive}`, sub: 'deals live now' },
-    { badge: 'S', tone: '#5ab0e8', label: `Steam ${profile.steamGames.toLocaleString()}`, sub: 'games' },
-    ...(gogGames > 0 ? [{ badge: 'G', tone: '#7b3ff2', label: `GOG ${gogGames.toLocaleString()}`, sub: 'games' }] : []),
-    ...(epicGames > 0 ? [{ badge: 'E', tone: '#c9d1da', label: `Epic ${epicGames.toLocaleString()}`, sub: 'games' }] : []),
-    ...(psnGames > 0 ? [{ badge: 'P', tone: '#2f6bd8', label: `PSN ${psnGames.toLocaleString()}`, sub: 'games' }] : []),
-    ...(xboxGames > 0 ? [{ badge: 'X', tone: '#16a34a', label: `Xbox ${xboxGames.toLocaleString()}`, sub: 'games' }] : []),
+    { store: 'Steam', tone: '#5ab0e8', label: `Steam ${profile.steamGames.toLocaleString()}`, sub: 'games' },
+    ...(gogGames > 0 ? [{ store: 'GOG' as StoreKey, tone: '#7b3ff2', label: `GOG ${gogGames.toLocaleString()}`, sub: 'games' }] : []),
+    ...(epicGames > 0 ? [{ store: 'Epic' as StoreKey, tone: '#c9d1da', label: `Epic ${epicGames.toLocaleString()}`, sub: 'games' }] : []),
+    ...(psnGames > 0 ? [{ store: 'PSN' as StoreKey, tone: '#2f6bd8', label: `PSN ${psnGames.toLocaleString()}`, sub: 'games' }] : []),
+    ...(xboxGames > 0 ? [{ store: 'Xbox' as StoreKey, tone: '#16a34a', label: `Xbox ${xboxGames.toLocaleString()}`, sub: 'games' }] : []),
+    ...(nintendoGames > 0 ? [{ store: 'Nintendo' as StoreKey, tone: '#e60012', label: `Nintendo ${nintendoGames.toLocaleString()}`, sub: 'games' }] : []),
+    ...(itchGames > 0 ? [{ store: 'itch.io' as StoreKey, tone: '#fa5c5c', label: `itch.io ${itchGames.toLocaleString()}`, sub: 'games' }] : []),
   ]
 
   const [t, setT] = useState(0)
@@ -110,7 +115,9 @@ export default function Dashboard() {
             {heroStores.map((s) => (
               <span key={s} className="store-chip" style={{ background: storeMeta[s].color }}
                 title={storeMeta[s].label}>
-                {storeMeta[s].glyph}
+                <svg className="store-chip-icon" viewBox="0 0 24 24" role="img" aria-label={storeMeta[s].label}>
+                  <path d={storeIconPaths[s]} fill="currentColor" />
+                </svg>
               </span>
             ))}
           </div>
@@ -209,10 +216,14 @@ function Stat({ value, label }: { value: string; label: string }) {
   )
 }
 
-function Quick({ badge, tone, label, sub }: { badge: string; tone: string; label: string; sub: string }) {
+function Quick({ badge, store, tone, label, sub }: { badge?: string; store?: StoreKey; tone: string; label: string; sub: string }) {
   return (
     <div className="quick-item">
-      <span className="quick-badge" style={{ borderColor: tone, color: tone }}>{badge}</span>
+      <span className="quick-badge" style={{ borderColor: tone, color: tone }}>
+        {store
+          ? <svg className="quick-badge-icon" viewBox="0 0 24 24" role="img" aria-label={store}><path d={storeIconPaths[store]} fill="currentColor" /></svg>
+          : badge}
+      </span>
       <span className="quick-label">{label}</span>
       <span className="quick-sub">{sub}</span>
     </div>

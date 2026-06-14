@@ -7,7 +7,7 @@
 // a Steam-only build would just leave those buckets empty.
 
 export type StoreKey =
-  | 'Steam' | 'GOG' | 'Epic' | 'PSN' | 'Xbox' | 'Amazon' | 'itch.io'
+  | 'Steam' | 'GOG' | 'Epic' | 'PSN' | 'Xbox' | 'Nintendo' | 'Amazon' | 'itch.io'
 
 export type GameStatus = 'Backlog' | 'Playing' | 'Finished' | 'Next' | 'Skip'
 
@@ -51,7 +51,7 @@ export const profile = {
   avatar: '', // UI renders an initial-based avatar; no external image needed
   totalGames: 2984,
   storesConnected: 7,
-  storesTotal: 12,
+  storesTotal: 10,
   playedHours: 412,
   backlogHours: 2847,
   avgReviewPct: 78,
@@ -102,6 +102,7 @@ export const storeMeta: Record<StoreKey, { label: string; color: string; glyph: 
   Epic:     { label: 'Epic',    color: '#2a2a2a', glyph: 'E' },
   PSN:      { label: 'PSN',     color: '#0070d1', glyph: 'P' },
   Xbox:     { label: 'Xbox',    color: '#107c10', glyph: 'X' },
+  Nintendo: { label: 'Nintendo',color: '#e60012', glyph: 'N' },
   Amazon:   { label: 'Amazon',  color: '#ff9900', glyph: 'A' },
   'itch.io':{ label: 'itch.io', color: '#fa5c5c', glyph: 'i' },
 }

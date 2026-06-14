@@ -1,18 +1,19 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../data/DataContext'
 import { storeMeta, type WishlistItem } from '../data/mockData'
+import { storeIconPaths } from '../data/storeIcons'
 
 type Sort = 'deal' | 'price' | 'review' | 'name'
-type StoreTab = 'Steam' | 'GOG' | 'Epic'
-const STORE_TABS: StoreTab[] = ['Steam', 'GOG', 'Epic']
+type StoreTab = 'Steam' | 'GOG' | 'Epic' | 'Nintendo'
+const STORE_TABS: StoreTab[] = ['Steam', 'GOG', 'Epic', 'Nintendo']
 
 export default function Wishlist() {
-  const { wishlist, wishlistTotal, wishlistPending, gogWishlist, epicWishlist } = useData()
+  const { wishlist, wishlistTotal, wishlistPending, gogWishlist, epicWishlist, nintendoWishlist } = useData()
   const [sort, setSort] = useState<Sort>('deal')
   const [onlyDeals, setOnlyDeals] = useState(false)
   const [storeTab, setStoreTab] = useState<StoreTab>('Steam')
 
-  const lists: Record<StoreTab, WishlistItem[]> = { Steam: wishlist, GOG: gogWishlist, Epic: epicWishlist }
+  const lists: Record<StoreTab, WishlistItem[]> = { Steam: wishlist, GOG: gogWishlist, Epic: epicWishlist, Nintendo: nintendoWishlist }
   // A store tab only appears once it has items (Steam is always shown), mirroring
   // how the dashboard only surfaces connected stores.
   const tabs = STORE_TABS.filter((s) => s === 'Steam' || lists[s].length > 0)
@@ -72,7 +73,9 @@ export default function Wishlist() {
         <div className="wish-tabs">
           {tabs.map((s) => (
             <button key={s} className={`wish-tab ${tab === s ? 'on' : ''}`} onClick={() => setStoreTab(s)}>
-              <span className="wish-tab-badge" style={{ background: storeMeta[s].color }}>{storeMeta[s].glyph}</span>
+              <span className="wish-tab-badge" style={{ background: storeMeta[s].color }}>
+                <svg className="wish-tab-icon" viewBox="0 0 24 24" role="img" aria-label={storeMeta[s].label}><path d={storeIconPaths[s]} fill="currentColor" /></svg>
+              </span>
               {storeMeta[s].label}
               <span className="count">{lists[s].length}</span>
             </button>

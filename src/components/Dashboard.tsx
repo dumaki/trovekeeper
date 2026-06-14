@@ -40,6 +40,7 @@ export default function Dashboard() {
   const xboxGames = library.filter((g) => g.store === 'Xbox').length
   const nintendoGames = library.filter((g) => g.store === 'Nintendo').length
   const itchGames = library.filter((g) => g.store === 'itch.io').length
+  const ubiGames = library.filter((g) => g.store === 'Ubisoft').length
   const playedCount = library.filter((g) => g.playtimeHours > 0).length
   const playedPct = pct(playedCount)
   const T = total.toLocaleString()
@@ -88,6 +89,7 @@ export default function Dashboard() {
     ...(xboxGames > 0 ? [{ store: 'Xbox' as StoreKey, tone: '#16a34a', label: `Xbox ${xboxGames.toLocaleString()}`, sub: 'games' }] : []),
     ...(nintendoGames > 0 ? [{ store: 'Nintendo' as StoreKey, tone: '#e60012', label: `Nintendo ${nintendoGames.toLocaleString()}`, sub: 'games' }] : []),
     ...(itchGames > 0 ? [{ store: 'itch.io' as StoreKey, tone: '#fa5c5c', label: `itch.io ${itchGames.toLocaleString()}`, sub: 'games' }] : []),
+    ...(ubiGames > 0 ? [{ store: 'Ubisoft' as StoreKey, tone: '#1a8fe3', label: `Ubisoft ${ubiGames.toLocaleString()}`, sub: 'games' }] : []),
   ]
 
   const [t, setT] = useState(0)

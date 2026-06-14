@@ -7,7 +7,7 @@
 // a Steam-only build would just leave those buckets empty.
 
 export type StoreKey =
-  | 'Steam' | 'GOG' | 'Epic' | 'PSN' | 'Xbox' | 'Nintendo' | 'Amazon' | 'itch.io'
+  | 'Steam' | 'GOG' | 'Epic' | 'PSN' | 'Xbox' | 'Nintendo' | 'Ubisoft' | 'Amazon' | 'itch.io'
 
 export type GameStatus = 'Backlog' | 'Playing' | 'Finished' | 'Next' | 'Skip'
 
@@ -103,6 +103,7 @@ export const storeMeta: Record<StoreKey, { label: string; color: string; glyph: 
   PSN:      { label: 'PSN',     color: '#0070d1', glyph: 'P' },
   Xbox:     { label: 'Xbox',    color: '#107c10', glyph: 'X' },
   Nintendo: { label: 'Nintendo',color: '#e60012', glyph: 'N' },
+  Ubisoft:  { label: 'Ubisoft', color: '#1a8fe3', glyph: 'U' },
   Amazon:   { label: 'Amazon',  color: '#ff9900', glyph: 'A' },
   'itch.io':{ label: 'itch.io', color: '#fa5c5c', glyph: 'i' },
 }

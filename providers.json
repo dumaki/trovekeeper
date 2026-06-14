@@ -32,6 +32,18 @@
       ]
     },
     {
+      "id": "epic",
+      "label": "Epic Games",
+      "env": [
+        {
+          "key": "EPIC_REFRESH_TOKEN",
+          "required": true,
+          "secret": true,
+          "hint": "run `npm run epic-login` to obtain this — don't enter it by hand"
+        }
+      ]
+    },
+    {
       "id": "igdb",
       "label": "IGDB (time-to-beat, optional)",
       "env": [

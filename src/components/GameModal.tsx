@@ -39,12 +39,12 @@ export default function GameModal({ game, onClose }: { game: Game; onClose: () =
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    fetch(`/api/game/${game.appid}?store=${encodeURIComponent(game.store)}`)
+    fetch(`/api/game/${game.appid}?store=${encodeURIComponent(game.store)}${game.storeId ? `&id=${encodeURIComponent(game.storeId)}` : ''}`)
       .then((r) => r.json())
       .then((d) => { if (!cancelled) { setDetail(d); setLoading(false) } })
       .catch(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [game.appid])
+  }, [game.appid, game.store, game.storeId])
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }

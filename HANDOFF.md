@@ -20,6 +20,7 @@ npm run typecheck # tsc over src/ AND server/  (run before committing)
 npm run doctor    # redacted config diagnostic (safe to share)
 npm run whoami    # resolve your SteamID64 from a vanity name
 npm run gog-login # one-time GOG OAuth: writes GOG_REFRESH_TOKEN to .env
+npm run epic-login # one-time Epic OAuth: writes EPIC_REFRESH_TOKEN to .env
 ```
 Owner usually runs their **own** `npm run dev` in a terminal. The Claude preview
 tool can't attach to it (it owns :5173/:8787), so to screenshot you must
@@ -90,6 +91,8 @@ achievements) · loader instead of mock flash · server type-checking.
   non-game filter (`NON_GAME_TYPES` + `NON_GAME_NAME_RE`).
 - `server/providers/gog.ts` — GOG OAuth token management + owned-library fetch
   (paged getFilteredProducts) + GOG game detail. Merged into steam.ts.
+- `server/providers/epic.ts` — Epic launcher OAuth + owned-library (assets +
+  catalog bulk) + wishlist (store GraphQL) + game detail. Merged into steam.ts.
 - `server/providers/igdb.ts` — Twitch auth + batched time-to-beat.
 - `src/components/Dashboard.tsx` — all dashboard math (computes from library +
   wishlist in context); `ASSUMED_HOURS_PER_GAME`, `TTB_CAP_HOURS`, cycling facts.
@@ -122,9 +125,20 @@ achievements) · loader instead of mock flash · server type-checking.
    ⚠ The GOG **price** parse (`api.gog.com/products/{id}/prices`, "1999 USD" →
    $19.99) is the one bit not yet verified against a live account — titles/art are
    solid, prices degrade to TBA if the shape differs. **Next GOG polish:** GOG
-   playtime (embed.gog.com user stats, if reliable) and GOG achievements. **Other
-   stores** (Epic, PSN…) follow the same provider shape — add to `providers.json`,
-   write a `providers/<x>.ts`, merge it in steam.ts's getLibrary/getDashboard/getWishlist.
+   playtime (embed.gog.com user stats, if reliable) and GOG achievements.
+   **Epic — DONE (library + wishlist).** `server/providers/epic.ts`, same shape as
+   GOG: `npm run epic-login` (Epic's public launcher OAuth client → rotating
+   refresh token). Library = launcher `assets/Windows` + catalog bulk metadata,
+   DLC filtered by category. Wishlist = store GraphQL (`launcher.store.epicgames.com
+   /graphql` `getWishlistQuery`) using the SAME launcher bearer (no separate store
+   session needed), prices inline. Epic catalog ids are non-numeric, so `Game`
+   gained an optional `storeId` (the catalogItemId); status keys + `/api/game` +
+   `/api/status` now thread it (`statusKey('Epic', appid, storeId)`). Epic has no
+   playtime/review-%/achievements. ⚠ Not verified against a live Epic account yet;
+   wishlist is best-effort and fails soft (empty tab) if Epic's GraphQL shifts.
+   **Other stores** (PSN, Xbox…) follow the same provider shape — add to
+   `providers.json`, write a `providers/<x>.ts`, merge in steam.ts's
+   getLibrary/getDashboard/getWishlist.
 2. **Community store tags** — would need scraping the store page (not in API).
 3. **Exact Steam game count** — currently 1,112 vs Steam's 1,105; the ~7 gap is
    multiplayer-component appids (e.g. "Modern Warfare 3 - Multiplayer") Steam

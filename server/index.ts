@@ -34,8 +34,12 @@ app.get('/api/library', route(() => steam.getLibrary()))
 app.get('/api/wishlist', route(() => steam.getWishlist()))
 app.get('/api/progress', route(() => steam.getProgress())) // boot-gate polling
 app.get('/api/game/:appid', route((req) =>
-  steam.getGameDetail(Number(req.params.appid), typeof req.query.store === 'string' ? req.query.store : undefined)))
-app.post('/api/status', route((req) => steam.setStatus(req.body?.appid, req.body?.status, req.body?.store)))
+  steam.getGameDetail(
+    Number(req.params.appid),
+    typeof req.query.store === 'string' ? req.query.store : undefined,
+    typeof req.query.id === 'string' ? req.query.id : undefined,
+  )))
+app.post('/api/status', route((req) => steam.setStatus(req.body?.appid, req.body?.status, req.body?.store, req.body?.storeId)))
 
 app.listen(PORT, () => {
   const live = steam.configured()

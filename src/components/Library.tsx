@@ -50,7 +50,7 @@ export default function Library() {
 
       <div className="game-grid">
         {games.map((g) => (
-          <article key={g.appid} className="game-card" onClick={() => setSelected(g)}>
+          <article key={`${g.store}-${g.storeId ?? g.appid}`} className="game-card" onClick={() => setSelected(g)}>
             <div className="cover">
               <img src={g.headerImage} alt={g.name} loading="lazy"
                 onError={(e) => { (e.currentTarget.style.visibility = 'hidden') }} />
@@ -61,7 +61,7 @@ export default function Library() {
                 value={g.status}
                 style={{ background: STATUS_TONE[g.status] }}
                 onClick={(e) => e.stopPropagation()}
-                onChange={(e) => setGameStatus(g.appid, e.target.value as GameStatus, g.store)}
+                onChange={(e) => setGameStatus(g.appid, e.target.value as GameStatus, g.store, g.storeId)}
                 aria-label={`Status for ${g.name}`}
               >
                 {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}

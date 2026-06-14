@@ -1,21 +1,23 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../data/DataContext'
-import { storeMeta } from '../data/mockData'
+import { storeMeta, type WishlistItem } from '../data/mockData'
 
 type Sort = 'deal' | 'price' | 'review' | 'name'
-type StoreTab = 'Steam' | 'GOG'
+type StoreTab = 'Steam' | 'GOG' | 'Epic'
+const STORE_TABS: StoreTab[] = ['Steam', 'GOG', 'Epic']
 
 export default function Wishlist() {
-  const { wishlist, wishlistTotal, wishlistPending, gogWishlist } = useData()
+  const { wishlist, wishlistTotal, wishlistPending, gogWishlist, epicWishlist } = useData()
   const [sort, setSort] = useState<Sort>('deal')
   const [onlyDeals, setOnlyDeals] = useState(false)
   const [storeTab, setStoreTab] = useState<StoreTab>('Steam')
 
-  // The GOG tab only appears once that wishlist has items, mirroring how the
-  // dashboard only surfaces connected stores.
-  const hasGog = gogWishlist.length > 0
-  const tab: StoreTab = hasGog ? storeTab : 'Steam'
-  const source = tab === 'GOG' ? gogWishlist : wishlist
+  const lists: Record<StoreTab, WishlistItem[]> = { Steam: wishlist, GOG: gogWishlist, Epic: epicWishlist }
+  // A store tab only appears once it has items (Steam is always shown), mirroring
+  // how the dashboard only surfaces connected stores.
+  const tabs = STORE_TABS.filter((s) => s === 'Steam' || lists[s].length > 0)
+  const tab: StoreTab = tabs.includes(storeTab) ? storeTab : 'Steam'
+  const source = lists[tab]
 
   const items = useMemo(() => {
     const list = onlyDeals ? source.filter((w) => w.discountPct > 0) : [...source]
@@ -34,10 +36,10 @@ export default function Wishlist() {
   const totalSavings = source.reduce((s, w) => s + (w.origPrice - w.price), 0)
 
   // Count label differs per tab: Steam can still be caching items in the
-  // background; GOG loads as one batch, so it's just a plain count.
-  const countLabel = tab === 'GOG'
-    ? <>{gogWishlist.length} games · </>
-    : (wishlistPending > 0 ? <>{wishlist.length} of {wishlistTotal} loaded · </> : <>{wishlistTotal} games · </>)
+  // background; other stores load as one batch, so it's just a plain count.
+  const countLabel = tab === 'Steam'
+    ? (wishlistPending > 0 ? <>{wishlist.length} of {wishlistTotal} loaded · </> : <>{wishlistTotal} games · </>)
+    : <>{source.length} games · </>
 
   return (
     <div className="page">
@@ -66,13 +68,13 @@ export default function Wishlist() {
         </div>
       </div>
 
-      {hasGog && (
+      {tabs.length > 1 && (
         <div className="wish-tabs">
-          {(['Steam', 'GOG'] as StoreTab[]).map((s) => (
+          {tabs.map((s) => (
             <button key={s} className={`wish-tab ${tab === s ? 'on' : ''}`} onClick={() => setStoreTab(s)}>
               <span className="wish-tab-badge" style={{ background: storeMeta[s].color }}>{storeMeta[s].glyph}</span>
               {storeMeta[s].label}
-              <span className="count">{(s === 'GOG' ? gogWishlist : wishlist).length}</span>
+              <span className="count">{lists[s].length}</span>
             </button>
           ))}
         </div>

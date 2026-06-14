@@ -18,6 +18,7 @@ import type {
 import { readCache, writeCache } from '../cache'
 import { igdbConfigured, fetchTimeToBeat } from './igdb'
 import * as gog from './gog'
+import * as epic from './epic'
 
 const API = 'https://api.steampowered.com'
 const hdr = (appid: number) =>
@@ -45,14 +46,16 @@ const STATUS_COLOR: Record<GameStatus, string> = {
 
 // Per-store donut colors for the "Library by Store" chart (merged across providers).
 const STORE_COLOR: Partial<Record<StoreKey, string>> = {
-  Steam: '#5ab0e8', GOG: '#7b3ff2',
+  Steam: '#5ab0e8', GOG: '#7b3ff2', Epic: '#c9d1da',
 }
 
 // Play-status is app-side state keyed per game. Steam keys stay bare (the appid)
 // for backward compatibility with existing caches; other stores are namespaced
-// so a GOG product id can't collide with a Steam appid.
-function statusKey(store: StoreKey, appid: number): string {
-  return store === 'Steam' ? String(appid) : `${store}:${appid}`
+// (by their store-native id when ids aren't numeric, e.g. Epic) so they can't
+// collide with a Steam appid.
+function statusKey(store: StoreKey, appid: number, storeId?: string): string {
+  if (store === 'Steam') return String(appid)
+  return `${store}:${storeId ?? appid}`
 }
 
 // Steam's review descriptors -> donut colors (green = good, amber = mixed, red = bad).
@@ -240,7 +243,7 @@ function defaultStatus(g: Game): GameStatus {
   return g.playtimeHours > 0 ? 'Playing' : 'Backlog'
 }
 
-export async function setStatus(appid: unknown, status: unknown, store?: unknown): Promise<{ ok: true }> {
+export async function setStatus(appid: unknown, status: unknown, store?: unknown, storeId?: unknown): Promise<{ ok: true }> {
   const idNum = Number(appid)
   if (!Number.isFinite(idNum)) throw new Error('invalid appid')
   if (typeof status !== 'string' || !STATUS_VALUES.includes(status as GameStatus)) {
@@ -248,8 +251,9 @@ export async function setStatus(appid: unknown, status: unknown, store?: unknown
   }
   // Unknown/missing store falls back to Steam (bare key) for backward compatibility.
   const s: StoreKey = (typeof store === 'string' && store in mock.storeMeta) ? (store as StoreKey) : 'Steam'
+  const sid = typeof storeId === 'string' && storeId ? storeId : undefined
   const cache = await readCache<StatusCache>('statuses.json', { items: {} })
-  cache.items[statusKey(s, idNum)] = status as GameStatus
+  cache.items[statusKey(s, idNum, sid)] = status as GameStatus
   await writeCache('statuses.json', cache)
   return { ok: true }
 }
@@ -277,7 +281,7 @@ async function fetchAchievements(appid: number): Promise<{ unlocked: number; tot
 
 // ---- Read-only request paths ---------------------------------------------
 export async function getLibrary(): Promise<{ source: Source; games: Game[] }> {
-  if (!configured() && !gog.configured()) return { source: 'mock', games: mock.library }
+  if (!configured() && !gog.configured() && !epic.configured()) return { source: 'mock', games: mock.library }
   const statuses = await getStatuses()
   const out: Game[] = []
 
@@ -307,13 +311,21 @@ export async function getLibrary(): Promise<{ source: Source; games: Game[] }> {
     }
   }
 
+  if (epic.configured()) {
+    const epicGames = await epic.getGames().catch(() => [] as Game[])
+    for (const g of epicGames) {
+      out.push({ ...g, status: statuses[statusKey('Epic', g.appid, g.storeId)] ?? defaultStatus(g) })
+    }
+  }
+
   return { source: 'live', games: out }
 }
 
 export async function getDashboard(): Promise<DashboardPayload> {
   const steamLive = configured()
   const gogLive = gog.configured()
-  if (!steamLive && !gogLive) {
+  const epicLive = epic.configured()
+  if (!steamLive && !gogLive && !epicLive) {
     return {
       source: 'mock', profile: mock.profile, trending: mock.trending,
       libraryByStore: mock.libraryByStore, statusBreakdown: mock.statusBreakdown,
@@ -323,15 +335,16 @@ export async function getDashboard(): Promise<DashboardPayload> {
 
   const games = steamLive ? await ownedGames() : []
   const gogGames = gogLive ? await gog.getGames().catch(() => [] as Game[]) : []
-  const totalGames = games.length + gogGames.length
+  const epicGames = epicLive ? await epic.getGames().catch(() => [] as Game[]) : []
+  const totalGames = games.length + gogGames.length + epicGames.length
   const rcache = await readCache<ReviewCache>('reviews.json', emptyReviewCache())
 
   // Profile is Steam-derived when available (persona/avatar/playtime); otherwise
-  // a minimal GOG-only profile. The store-spanning fields are overridden below.
+  // a minimal non-Steam profile. The store-spanning fields are overridden below.
   const baseProfile = steamLive
     ? await fetchProfile(games)
     : {
-        ...mock.profile, personaName: 'GOG User', avatar: '', totalGames: 0,
+        ...mock.profile, personaName: 'Player', avatar: '', totalGames: 0,
         steamGames: 0, storesConnected: 0, playedHours: 0, backlogHours: 0, completePct: 0,
       }
 
@@ -357,6 +370,7 @@ export async function getDashboard(): Promise<DashboardPayload> {
   if (totalGames) {
     if (games.length) libraryByStore.push({ key: 'Steam', value: Math.round((games.length / totalGames) * 100), color: STORE_COLOR.Steam! })
     if (gogGames.length) libraryByStore.push({ key: 'GOG', value: Math.round((gogGames.length / totalGames) * 100), color: STORE_COLOR.GOG! })
+    if (epicGames.length) libraryByStore.push({ key: 'Epic', value: Math.round((epicGames.length / totalGames) * 100), color: STORE_COLOR.Epic! })
   }
 
   return {
@@ -364,7 +378,7 @@ export async function getDashboard(): Promise<DashboardPayload> {
     profile: {
       ...baseProfile,
       totalGames,
-      storesConnected: (steamLive ? 1 : 0) + (gogLive ? 1 : 0),
+      storesConnected: (steamLive ? 1 : 0) + (gogLive ? 1 : 0) + (epicLive ? 1 : 0),
       avgReviewPct: pctN ? Math.round(pctSum / pctN) : 0,
     },
     trending: mock.trending, // no public "trending in your library" endpoint
@@ -375,13 +389,17 @@ export async function getDashboard(): Promise<DashboardPayload> {
 }
 
 export async function getWishlist(): Promise<{
-  source: Source; items: WishlistItem[]; total: number; pending: number; gog: WishlistItem[]
+  source: Source; items: WishlistItem[]; total: number; pending: number
+  gog: WishlistItem[]; epic: WishlistItem[]
 }> {
-  // GOG wishlist (separate tab on the frontend) — independent of Steam's warming.
+  // GOG/Epic wishlists (separate tabs on the frontend) — independent of Steam's warming.
   const gogItems = gog.configured() ? await gog.getWishlist().catch(() => [] as WishlistItem[]) : []
+  const epicItems = epic.configured() ? await epic.getWishlist().catch(() => [] as WishlistItem[]) : []
   if (!configured()) {
-    if (gog.configured()) return { source: 'live', items: [], total: 0, pending: 0, gog: gogItems }
-    return { source: 'mock', items: mock.wishlist, total: mock.wishlist.length, pending: 0, gog: mock.gogWishlist }
+    if (gog.configured() || epic.configured()) {
+      return { source: 'live', items: [], total: 0, pending: 0, gog: gogItems, epic: epicItems }
+    }
+    return { source: 'mock', items: mock.wishlist, total: mock.wishlist.length, pending: 0, gog: mock.gogWishlist, epic: mock.epicWishlist }
   }
   const appids = await wishlistAppids()
   const cache = await readCache<WishlistCache>('wishlist.json', emptyWishlistCache())
@@ -391,7 +409,7 @@ export async function getWishlist(): Promise<{
     const m = cache.misses?.[String(a)]; return m !== undefined && now - m < MISS_TTL
   }).length
   const pending = Math.max(0, appids.length - items.length - activeMisses)
-  return { source: 'live', items, total: appids.length, pending, gog: gogItems }
+  return { source: 'live', items, total: appids.length, pending, gog: gogItems, epic: epicItems }
 }
 
 // ---- Game detail (on-demand, for the Library detail card) -----------------
@@ -422,11 +440,12 @@ export interface GameDetail {
 const detailMem = new Map<number, { at: number; data: GameDetail }>()
 const DETAIL_TTL = 10 * 60_000
 
-export async function getGameDetail(appid: number, store?: string): Promise<GameDetail> {
-  if (!Number.isFinite(appid)) throw new Error('invalid appid')
-  // GOG product ids live in their own namespace — route them to the GOG fetcher
-  // rather than Steam's storefront (which would 404 on a GOG id).
+export async function getGameDetail(appid: number, store?: string, storeId?: string): Promise<GameDetail> {
+  // Non-Steam stores live in their own id namespace — route them to their
+  // provider rather than Steam's storefront (which would 404 on a foreign id).
   if (store === 'GOG') return gog.getGameDetail(appid)
+  if (store === 'Epic') return epic.getGameDetail(storeId ?? String(appid))
+  if (!Number.isFinite(appid)) throw new Error('invalid appid')
   const cached = detailMem.get(appid)
   if (cached && Date.now() - cached.at < DETAIL_TTL) return cached.data
 
@@ -523,6 +542,7 @@ export function startWarmer(): void {
   if (warmerStarted) return
   warmerStarted = true
   gog.startWarmer() // self-guards on GOG credentials; runs independently of Steam
+  epic.startWarmer() // self-guards on Epic credentials
   if (!configured()) return
 
   // Two independent pacers: storefront (appdetails/appreviews, ~40/min cap) and

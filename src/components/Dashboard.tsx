@@ -34,6 +34,7 @@ export default function Dashboard() {
   const dealsLive = wishlist.filter((w) => w.discountPct > 0).length
   const backlogGames = counts.Backlog + counts.Next
   const gogGames = library.filter((g) => g.store === 'GOG').length
+  const epicGames = library.filter((g) => g.store === 'Epic').length
   const playedCount = library.filter((g) => g.playtimeHours > 0).length
   const playedPct = pct(playedCount)
   const T = total.toLocaleString()
@@ -77,6 +78,7 @@ export default function Dashboard() {
     { badge: 'W', tone: '#f5c518', label: `Wishlist ${dealsLive}`, sub: 'deals live now' },
     { badge: 'S', tone: '#5ab0e8', label: `Steam ${profile.steamGames.toLocaleString()}`, sub: 'games' },
     ...(gogGames > 0 ? [{ badge: 'G', tone: '#7b3ff2', label: `GOG ${gogGames.toLocaleString()}`, sub: 'games' }] : []),
+    ...(epicGames > 0 ? [{ badge: 'E', tone: '#c9d1da', label: `Epic ${epicGames.toLocaleString()}`, sub: 'games' }] : []),
   ]
 
   const [t, setT] = useState(0)

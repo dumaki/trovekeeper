@@ -16,6 +16,7 @@ export type ReviewBand =
 
 export interface Game {
   appid: number
+  storeId?: string       // store-native id for stores whose ids aren't numeric (e.g. Epic catalogItemId)
   name: string
   store: StoreKey
   status: GameStatus
@@ -153,4 +154,11 @@ export const gogWishlist: WishlistItem[] = [
   { appid: 1452598624, name: 'Cyberpunk 2077: Phantom Liberty', price: 24.99, origPrice: 29.99, discountPct: 17, reviewPct: 0, releasedAt: '2023-09-26', headerImage: hdr(2138330) },
   { appid: 1207666393, name: 'Gwent: The Witcher Card Game', price: 0, origPrice: 0, discountPct: 0, reviewPct: 0, releasedAt: '2018-10-23', headerImage: hdr(1284410) },
   { appid: 1895572983, name: 'Sea of Stars',           price: 27.99, origPrice: 34.99, discountPct: 20, reviewPct: 0, releasedAt: '2023-08-29', headerImage: hdr(1244090) },
+]
+
+// ---- Epic wishlist (separate tab) ---------------------------------------
+export const epicWishlist: WishlistItem[] = [
+  { appid: 2100000101, name: 'Alan Wake 2',            price: 29.99, origPrice: 49.99, discountPct: 40, reviewPct: 0, releasedAt: '2023-10-27', headerImage: hdr(2255150) },
+  { appid: 2100000102, name: 'Kingdom Come: Deliverance II', price: 49.99, origPrice: 59.99, discountPct: 17, reviewPct: 0, releasedAt: '2025-02-04', headerImage: hdr(1771300) },
+  { appid: 2100000103, name: 'Hades II',               price: 0, origPrice: 0, discountPct: 0, reviewPct: 0, releasedAt: '2024-05-06', headerImage: hdr(1145350) },
 ]

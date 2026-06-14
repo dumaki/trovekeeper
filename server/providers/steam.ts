@@ -69,6 +69,10 @@ const TYPE_TTL = 90 * 24 * 60 * 60 * 1000    // an app's type never changes -> r
 // is unknown (not yet fetched, or no store page) default to "game" so genuinely
 // delisted games (e.g. old GTA titles) are never wrongly dropped.
 const NON_GAME_TYPES = new Set(['music', 'video', 'movie', 'demo', 'dlc', 'mod', 'advertising', 'episode', 'series', 'hardware'])
+// Demos / beta branches / test builds have no store page (so appdetails can't
+// type them) but are clearly not games — match them by name. Kept tight to
+// avoid catching real titles (verified against the library: 0 false positives).
+const NON_GAME_NAME_RE = /\bdemo\b|\bbeta\b|\bplaytest\b|public test|staging branch|\bunstable\b|dev branch|\bSDK\b|dedicated server|authoring tools|\bbenchmark\b/i
 
 interface ReviewEntry { pct: number; desc: string; reviewedAt: number }
 interface ReviewCache { items: Record<string, ReviewEntry> }
@@ -181,7 +185,10 @@ async function getAppTypes(): Promise<Record<string, TypeEntry>> {
 async function ownedGames(): Promise<Game[]> {
   const raw = await ownedGamesRaw()
   const types = await getAppTypes()
-  return raw.filter((g) => !NON_GAME_TYPES.has(types[String(g.appid)]?.type ?? 'game'))
+  return raw.filter((g) =>
+    !NON_GAME_TYPES.has(types[String(g.appid)]?.type ?? 'game') &&
+    !NON_GAME_NAME_RE.test(g.name),
+  )
 }
 
 let wishMemo: { at: number; appids: number[] } | null = null

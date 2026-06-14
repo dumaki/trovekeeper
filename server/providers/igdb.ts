@@ -5,7 +5,7 @@
 // 4 req/s limit) so the whole library resolves in a handful of calls.
 const TWITCH_TOKEN_URL = 'https://id.twitch.tv/oauth2/token'
 const IGDB = 'https://api.igdb.com/v4'
-const STEAM_CATEGORY = 1 // IGDB external_game category for Steam
+const STEAM_SOURCE = 1 // IGDB external_game_sources id for Steam (the legacy `category` enum is deprecated)
 const BATCH = 400
 
 const clientId = () => process.env.IGDB_CLIENT_ID
@@ -62,7 +62,7 @@ export async function fetchTimeToBeat(appids: number[]): Promise<Record<string, 
     const uids = batch.map((a) => `"${a}"`).join(',')
     const rows = await igdbQuery(
       'external_games',
-      `fields game,uid; where category = ${STEAM_CATEGORY} & uid = (${uids}); limit 500;`,
+      `fields game,uid; where external_game_source = ${STEAM_SOURCE} & uid = (${uids}); limit 500;`,
     )
     for (const r of rows) if (r.game && r.uid != null) appidToGame[String(r.uid)] = r.game
   }

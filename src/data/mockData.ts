@@ -51,7 +51,7 @@ export const profile = {
   avatar: '', // UI renders an initial-based avatar; no external image needed
   totalGames: 2984,
   storesConnected: 7,
-  storesTotal: 10,
+  storesTotal: 9,
   playedHours: 412,
   backlogHours: 2847,
   avgReviewPct: 78,

@@ -15,9 +15,9 @@ tabs: **Dashboard**, **Library**, **Wishlist** (Wishlist has per-store sub-tabs)
   non-Steam store is its own provider merged into the library, dashboard donut,
   and the quick-strip marquee chips. Store chips render real **brand logos**
   (`src/data/storeIcons.ts`).
-- **Store target is 10** (`storesTotal`): the 8 above + 2 remaining — **EA**
-  (next), **Amazon**. Humble Bundle (keys already redeemed on Steam) and
-  Battle.net (no owned-games API) were intentionally dropped.
+- **Store target is 10** (`storesTotal`): the 8 above + 2 remaining — **Amazon**
+  (next) and **EA** (deferred — see follow-ups). Humble Bundle (keys already
+  redeemed on Steam) and Battle.net (no owned-games API) were intentionally dropped.
 
 ## Run / verify
 ```bash
@@ -242,11 +242,27 @@ Hard-won conventions:
   universal. No achievements on this surface. spaceId hashed into appid (2.9B).
 
 ## Open follow-ups / next up
-1. **EA (next store)** — `accounts.ea.com` OAuth → access token; owned + playtime
-   + achievements (rich, but fiddly auth). DevTools-capturable.
-2. **Amazon** after EA — Login-with-Amazon device OAuth like Nile/Heroic; owned +
-   art only (sparse). **Humble Bundle + Battle.net dropped** (Humble keys all
-   redeemed on Steam already; Battle.net has no owned-games API). Optional Ubisoft
+1. **Amazon (next store)** — Login-with-Amazon device OAuth like Nile/Heroic;
+   owned + art only (sparse). DevTools/proxy-capturable. Needs a claimed Prime
+   Gaming game to test against.
+2. **EA — DEFERRED.** EA removed the web games list (April 2025 Origin sunset);
+   the library is now only in the desktop EA app, so there's nothing to capture
+   in-browser. The API would be *rich* (owned + playtime + achievements) and the
+   endpoints are known (FriendsOfGalaxy `galaxy-integration-origin`/`-ead`): auth
+   = cookie-backed `GET accounts.ea.com/connect/auth?response_type=token&prompt=none`
+   → access_token (Bearer + `AuthToken` + `X-AuthToken`); identity =
+   `gateway.ea.com/proxy/identity/pids/me`; owned =
+   `api{1-4}.origin.com/ecommerce2/consolidatedentitlements/{pid}` (Accept
+   `application/vnd.origin.v3+json`); names = `…/ecommerce2/public/supercat/{offerId}/en_US`;
+   playtime = `…/atom/users/{pid}/games/{masterTitleId}/usage`; achievements =
+   `achievements.gameservices.ea.com/achievements/personas/{personaId}/{set}/all`.
+   Two routes to revisit: (a) cheap — grab the `accounts.ea.com` cookie and test
+   whether a browser-minted token still authorizes the entitlements API
+   server-side (post-Origin it may be dead); (b) reliable but heavy — proxy-
+   capture the desktop EA app (Proxyman/mitmproxy + cert, possible pinning).
+   Owner has only ~2 EA games, so low value — deprioritised.
+3. **Amazon + Humble + Battle.net** note: **Humble + Battle.net dropped** (Humble
+   keys all redeemed on Steam; Battle.net has no owned-games API). Optional Ubisoft
    follow-up: **achievements/Units** (a separate club endpoint, not yet wired).
 3. **Nintendo wishlist** — dormant; needs a nintendo.com wishlist XHR capture
    (see the Nintendo "Wishlist: TODO" note). Same for **PSN + Xbox wishlist**.

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Dashboard from './components/Dashboard'
 import Library from './components/Library'
 import Wishlist from './components/Wishlist'
@@ -21,8 +21,37 @@ const SOURCE_LABEL: Record<string, { text: string; cls: string }> = {
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard')
-  const { source, dashboard } = useData()
+  const { source, dashboard, library } = useData()
   const badge = SOURCE_LABEL[source]
+
+  // The "Live Steam data" pill only earns its place when Steam is your sole
+  // connected store — that's the case where it's reassuring to know you've
+  // moved off the bundled sample data. With multiple stores merged it'd be
+  // misleading (it isn't only Steam) and redundant, so we hide it. The
+  // loading/sample states always show.
+  const storeCount = new Set(library.map((g) => g.store)).size
+  const showBadge = source !== 'live' || storeCount <= 1
+
+  // Avatar: prefer a user-picked custom image (persisted), else the Steam
+  // profile picture, else fall back to the persona initial.
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [customAvatar, setCustomAvatar] = useState<string | null>(
+    () => localStorage.getItem('tk_avatar'),
+  )
+  const avatarSrc = customAvatar || dashboard.profile.avatar
+  const persona = dashboard.profile.personaName
+
+  function onPickAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const url = String(reader.result)
+      setCustomAvatar(url)
+      try { localStorage.setItem('tk_avatar', url) } catch { /* quota — keep in-memory */ }
+    }
+    reader.readAsDataURL(file)
+  }
 
   return (
     <div className="app">
@@ -40,14 +69,23 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className={`source-badge ${badge.cls}`}>
-          <span className="source-dot" />
-          {badge.text}
-        </div>
-        <div className="profile-card">
-          <span className="avatar">{dashboard.profile.personaName[0]}</span>
-          <div>
-            <div className="profile-name">{dashboard.profile.personaName}</div>
+        <div className="sidebar-footer">
+          {showBadge && (
+            <div className={`source-badge ${badge.cls}`}>
+              <span className="source-dot" />
+              {badge.text}
+            </div>
+          )}
+          <div className="profile-card">
+            <button type="button" className="avatar" onClick={() => fileInput.current?.click()}
+              title="Change profile picture">
+              {avatarSrc
+                ? <img src={avatarSrc} alt={persona} />
+                : <span>{persona[0]}</span>}
+              <span className="avatar-edit">Edit</span>
+            </button>
+            <input ref={fileInput} type="file" accept="image/*" hidden onChange={onPickAvatar} />
+            <div className="profile-name">{persona}</div>
             <div className="profile-sub">{dashboard.profile.totalGames.toLocaleString()} games</div>
           </div>
         </div>

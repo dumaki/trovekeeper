@@ -63,8 +63,15 @@ b { font-weight: 700; color: var(--text); }
 }
 .nav-icon { width: 18px; text-align: center; color: var(--accent); }
 
-.source-badge {
+/* Pinned to the bottom of the sidebar; holds the (optional) source pill and the
+   profile card so the profile stays anchored even when the pill is hidden. */
+.sidebar-footer {
   margin-top: auto;
+  display: flex; flex-direction: column; gap: 14px;
+}
+
+.source-badge {
+  align-self: stretch;
   display: flex; align-items: center; gap: 8px;
   padding: 8px 12px; border-radius: 999px;
   font-size: 12px; font-weight: 600; color: var(--muted);
@@ -80,19 +87,32 @@ b { font-weight: 700; color: var(--text); }
 .legend-empty { color: var(--muted); font-style: italic; }
 
 .profile-card {
-  margin-top: 14px;
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px; border-radius: 12px;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: 10px;
+  padding: 18px 14px; border-radius: 14px;
   background: var(--panel); border: 1px solid var(--border);
 }
 .avatar {
-  width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
-  display: grid; place-items: center;
+  position: relative;
+  width: 88px; height: 88px; border-radius: 18px; flex-shrink: 0;
+  display: grid; place-items: center; overflow: hidden;
+  padding: 0; border: none; cursor: pointer;
   background: linear-gradient(135deg, var(--accent), #7b3ff2);
-  color: #06121f; font-weight: 800; font-size: 18px;
+  color: #06121f; font-weight: 800; font-size: 38px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
 }
-.profile-name { font-weight: 700; font-size: 14px; }
-.profile-sub { color: var(--muted); font-size: 12px; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* "Edit" overlay slides up on hover so it's clear the avatar is clickable. */
+.avatar-edit {
+  position: absolute; inset: auto 0 0 0;
+  padding: 4px 0; font-size: 11px; font-weight: 700; color: #fff;
+  background: rgba(0,0,0,0.6); letter-spacing: 0.3px;
+  opacity: 0; transform: translateY(100%);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.avatar:hover .avatar-edit { opacity: 1; transform: translateY(0); }
+.profile-name { font-weight: 800; font-size: 17px; }
+.profile-sub { color: var(--muted); font-size: 13px; }
 
 .content { flex: 1; min-width: 0; padding: 26px 30px 60px; }
 
@@ -137,12 +157,40 @@ b { font-weight: 700; color: var(--text); }
 
 .store-row { display: flex; gap: 8px; margin-bottom: 18px; }
 .store-chip {
+  position: relative;
   width: 34px; height: 34px; border-radius: 9px;
   display: grid; place-items: center;
   font-weight: 800; font-size: 15px; color: #fff;
   box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  cursor: default; transition: opacity 0.15s ease;
 }
 .store-chip-icon { width: 19px; height: 19px; fill: currentColor; }
+
+/* Inactive = no games owned on that store. Gray it out so users can still
+   see the option, with a clear visual gap from the active (brand-color) ones. */
+.store-chip.inactive {
+  background: #2b303b;
+  box-shadow: none;
+  color: #7b8494;
+}
+.store-chip.inactive .store-chip-icon { opacity: 0.45; }
+.store-chip.inactive:hover { opacity: 0.85; }
+
+/* Hover tooltip naming the store (active or not). */
+.store-chip::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 8px); left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 4px 8px; border-radius: 6px; white-space: nowrap;
+  background: #0d1117; color: #e6edf3;
+  font-size: 12px; font-weight: 600; line-height: 1;
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  z-index: 20;
+}
+.store-chip:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 .hero-facts { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14.5px; color: var(--muted); margin-bottom: 22px; }
 .hero-facts .dot { opacity: 0.4; }

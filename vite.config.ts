@@ -6,7 +6,9 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
+    // Honor PORT when set (e.g. the Claude preview runner assigns a free port so
+    // it never collides with a dev server already on 5173); default otherwise.
+    port: Number(process.env.PORT) || 5173,
     proxy: {
       '/api': {
         target: 'http://localhost:8787',

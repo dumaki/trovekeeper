@@ -43,6 +43,13 @@ export default function Dashboard() {
   const itchGames = library.filter((g) => g.store === 'itch.io').length
   const ubiGames = library.filter((g) => g.store === 'Ubisoft').length
   const amazonGames = library.filter((g) => g.store === 'Amazon').length
+  // Per-store owned counts → drives which hero chips render in brand color
+  // (active) vs grayed out (no games yet) for at-a-glance discoverability.
+  const storeCounts: Record<StoreKey, number> = {
+    Steam: profile.steamGames, GOG: gogGames, Epic: epicGames, PSN: psnGames,
+    Xbox: xboxGames, Nintendo: nintendoGames, Ubisoft: ubiGames, Amazon: amazonGames,
+    'itch.io': itchGames,
+  }
   const playedCount = library.filter((g) => g.playtimeHours > 0).length
   const playedPct = pct(playedCount)
   const T = total.toLocaleString()
@@ -131,14 +138,18 @@ export default function Dashboard() {
           </p>
 
           <div className="store-row">
-            {heroStores.map((s) => (
-              <span key={s} className="store-chip" style={{ background: storeMeta[s].color }}
-                title={storeMeta[s].label}>
-                <svg className="store-chip-icon" viewBox="0 0 24 24" role="img" aria-label={storeMeta[s].label}>
-                  <path d={storeIconPaths[s]} fill="currentColor" />
-                </svg>
-              </span>
-            ))}
+            {heroStores.map((s) => {
+              const active = storeCounts[s] > 0
+              return (
+                <span key={s} className={`store-chip${active ? '' : ' inactive'}`}
+                  style={active ? { background: storeMeta[s].color } : undefined}
+                  data-tip={storeMeta[s].label}>
+                  <svg className="store-chip-icon" viewBox="0 0 24 24" role="img" aria-label={storeMeta[s].label}>
+                    <path d={storeIconPaths[s]} fill="currentColor" />
+                  </svg>
+                </span>
+              )
+            })}
           </div>
 
           <div className="hero-facts">

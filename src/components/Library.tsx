@@ -8,21 +8,30 @@ const STATUS_TONE: Record<GameStatus, string> = {
 }
 const STATUS_OPTIONS: GameStatus[] = ['Backlog', 'Playing', 'Next', 'Finished', 'Skip']
 
-const stores = ['All', ...Object.keys(storeMeta)] as (StoreKey | 'All')[]
-const statuses: (GameStatus | 'All')[] = ['All', 'Playing', 'Next', 'Backlog', 'Finished', 'Skip']
+const STORE_KEYS = Object.keys(storeMeta) as StoreKey[]
+const STATUS_FILTERS: GameStatus[] = ['Playing', 'Next', 'Backlog', 'Finished', 'Skip']
+
+// Toggle a value in/out of a set, returning a new set (immutable update).
+function toggled<T>(set: Set<T>, v: T): Set<T> {
+  const n = new Set(set)
+  n.has(v) ? n.delete(v) : n.add(v)
+  return n
+}
 
 export default function Library() {
   const { library, setGameStatus } = useData()
-  const [store, setStore] = useState<StoreKey | 'All'>('All')
-  const [status, setStatus] = useState<GameStatus | 'All'>('All')
+  // Multi-select filters: empty set = no filter (show all). Selected stores OR
+  // together, selected statuses OR together, the two groups AND together.
+  const [storeSel, setStoreSel] = useState<Set<StoreKey>>(new Set())
+  const [statusSel, setStatusSel] = useState<Set<GameStatus>>(new Set())
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState<Game | null>(null)
 
   const games = useMemo(() => library.filter((g) =>
-    (store === 'All' || g.store === store) &&
-    (status === 'All' || g.status === status) &&
+    (storeSel.size === 0 || storeSel.has(g.store)) &&
+    (statusSel.size === 0 || statusSel.has(g.status)) &&
     g.name.toLowerCase().includes(q.toLowerCase())
-  ), [library, store, status, q])
+  ), [library, storeSel, statusSel, q])
 
   return (
     <div className="page">
@@ -37,13 +46,17 @@ export default function Library() {
 
       <div className="filter-bar">
         <div className="filter-group">
-          {stores.map((s) => (
-            <button key={s} className={`chip ${store === s ? 'on' : ''}`} onClick={() => setStore(s)}>{s}</button>
+          <button className={`chip ${storeSel.size === 0 ? 'on' : ''}`} onClick={() => setStoreSel(new Set())}>All</button>
+          {STORE_KEYS.map((s) => (
+            <button key={s} className={`chip ${storeSel.has(s) ? 'on' : ''}`}
+              onClick={() => setStoreSel(toggled(storeSel, s))}>{storeMeta[s].label}</button>
           ))}
         </div>
         <div className="filter-group">
-          {statuses.map((s) => (
-            <button key={s} className={`chip ${status === s ? 'on' : ''}`} onClick={() => setStatus(s)}>{s}</button>
+          <button className={`chip ${statusSel.size === 0 ? 'on' : ''}`} onClick={() => setStatusSel(new Set())}>All</button>
+          {STATUS_FILTERS.map((s) => (
+            <button key={s} className={`chip ${statusSel.has(s) ? 'on' : ''}`}
+              onClick={() => setStatusSel(toggled(statusSel, s))}>{s}</button>
           ))}
         </div>
       </div>

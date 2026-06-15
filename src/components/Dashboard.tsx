@@ -41,6 +41,7 @@ export default function Dashboard() {
   const nintendoGames = library.filter((g) => g.store === 'Nintendo').length
   const itchGames = library.filter((g) => g.store === 'itch.io').length
   const ubiGames = library.filter((g) => g.store === 'Ubisoft').length
+  const amazonGames = library.filter((g) => g.store === 'Amazon').length
   const playedCount = library.filter((g) => g.playtimeHours > 0).length
   const playedPct = pct(playedCount)
   const T = total.toLocaleString()
@@ -90,6 +91,7 @@ export default function Dashboard() {
     ...(nintendoGames > 0 ? [{ store: 'Nintendo' as StoreKey, tone: '#e60012', label: `Nintendo ${nintendoGames.toLocaleString()}`, sub: 'games' }] : []),
     ...(itchGames > 0 ? [{ store: 'itch.io' as StoreKey, tone: '#fa5c5c', label: `itch.io ${itchGames.toLocaleString()}`, sub: 'games' }] : []),
     ...(ubiGames > 0 ? [{ store: 'Ubisoft' as StoreKey, tone: '#1a8fe3', label: `Ubisoft ${ubiGames.toLocaleString()}`, sub: 'games' }] : []),
+    ...(amazonGames > 0 ? [{ store: 'Amazon' as StoreKey, tone: '#ff9900', label: `Amazon ${amazonGames.toLocaleString()}`, sub: 'games' }] : []),
   ]
 
   const [t, setT] = useState(0)

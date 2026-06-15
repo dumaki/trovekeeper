@@ -98,6 +98,24 @@
       ]
     },
     {
+      "id": "amazon",
+      "label": "Amazon",
+      "env": [
+        {
+          "key": "AMAZON_REFRESH_TOKEN",
+          "required": true,
+          "secret": true,
+          "hint": "run `npm run amazon-login` to obtain this — don't enter it by hand"
+        },
+        {
+          "key": "AMAZON_SERIAL",
+          "required": true,
+          "secret": false,
+          "hint": "registered device serial (set by `npm run amazon-login`) — used for the library hardwareHash"
+        }
+      ]
+    },
+    {
       "id": "itch",
       "label": "itch.io",
       "env": [

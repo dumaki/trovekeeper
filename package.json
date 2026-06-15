@@ -14,6 +14,7 @@
     "nintendo-login": "node scripts/nintendo-login.mjs",
     "itch-login": "node scripts/itch-login.mjs",
     "ubisoft-login": "node scripts/ubisoft-login.mjs",
+    "amazon-login": "node scripts/amazon-login.mjs",
     "dev": "concurrently -k -n web,api -c cyan,green \"vite\" \"npm run server\"",
     "web": "vite",
     "server": "tsx watch server/index.ts",

@@ -152,9 +152,15 @@ export default function Dashboard() {
         </div>
         <div className="trending-card">
           <p className="eyebrow">Trending Now</p>
+          {cur.headerImage && (
+            <img className="trending-art" src={cur.headerImage} alt={cur.name} loading="lazy"
+              onError={(e) => { e.currentTarget.style.display = 'none' }} />
+          )}
           <h2>{cur.name}</h2>
           <p className="trending-meta">
-            <b>{cur.reviewPct}%</b> review · <b>{cur.mainHours}h</b> main · {cur.status}
+            <span className="store-tag" style={{ background: storeMeta[cur.store].color }}>{storeMeta[cur.store].label}</span>
+            {cur.discountPct > 0 && <b className="trend-disc">−{cur.discountPct}%</b>}
+            {' '}{cur.price > 0 ? `$${cur.price.toFixed(2)}` : 'Free'}
           </p>
         </div>
       </section>

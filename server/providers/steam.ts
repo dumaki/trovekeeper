@@ -371,6 +371,55 @@ export async function getLibrary(): Promise<{ source: Source; games: Game[] }> {
   return { source: 'live', games: out }
 }
 
+// ---- Trending Now (live Steam top sellers; public storefront, no auth) -----
+// Cached ~1h so we don't hammer the (rate-limited) storefront. Hardware (Steam
+// Deck/Controller) shows up in top sellers, so it's filtered by name.
+const TRENDING_TTL = 60 * 60 * 1000
+const TRENDING_HW_RE = /\b(steam (deck|controller|link|machine)|valve index)\b/i
+let trendingMemo: { items: typeof mock.trending; at: number } | null = null
+let trendingInflight: Promise<typeof mock.trending> | null = null
+
+async function fetchTrending(): Promise<typeof mock.trending> {
+  const res = await fetch('https://store.steampowered.com/api/featuredcategories?cc=us&l=en',
+    { signal: AbortSignal.timeout(12_000) })
+  if (!res.ok) throw new Error(`featuredcategories -> ${res.status}`)
+  const items: any[] = ((await res.json()) as any)?.top_sellers?.items ?? []
+  const seen = new Set<number>()
+  const out: typeof mock.trending = []
+  for (const it of items) {
+    const id = Number(it.id)
+    if (!id || seen.has(id)) continue
+    if (typeof it.name === 'string' && TRENDING_HW_RE.test(it.name)) continue
+    seen.add(id)
+    out.push({
+      name: it.name ?? `App ${id}`,
+      store: 'Steam' as StoreKey,
+      headerImage: it.header_image || it.large_capsule_image || '',
+      price: (it.final_price ?? 0) / 100,
+      origPrice: (it.original_price ?? it.final_price ?? 0) / 100,
+      discountPct: it.discount_percent ?? 0,
+    })
+    if (out.length >= 12) break
+  }
+  return out
+}
+
+async function getTrending(): Promise<typeof mock.trending> {
+  if (trendingMemo && Date.now() - trendingMemo.at < TRENDING_TTL) return trendingMemo.items
+  if (trendingInflight) return trendingInflight
+  trendingInflight = fetchTrending()
+    .then((items) => {
+      if (items.length) trendingMemo = { items, at: Date.now() }
+      return items.length ? items : (trendingMemo?.items ?? mock.trending)
+    })
+    .catch((e) => {
+      console.error('[steam] trending fetch failed:', (e as Error).message)
+      return trendingMemo?.items ?? mock.trending
+    })
+    .finally(() => { trendingInflight = null })
+  return trendingInflight
+}
+
 export async function getDashboard(): Promise<DashboardPayload> {
   const steamLive = configured()
   const gogLive = gog.configured()
@@ -449,7 +498,7 @@ export async function getDashboard(): Promise<DashboardPayload> {
       storesConnected: (steamLive ? 1 : 0) + (gogLive ? 1 : 0) + (epicLive ? 1 : 0) + (psnLive ? 1 : 0) + (xboxLive ? 1 : 0) + (nintendoLive ? 1 : 0) + (itchLive ? 1 : 0) + (ubiLive ? 1 : 0) + (amazonLive ? 1 : 0),
       avgReviewPct: pctN ? Math.round(pctSum / pctN) : 0,
     },
-    trending: mock.trending, // no public "trending in your library" endpoint
+    trending: await getTrending(), // live Steam top sellers (falls back to mock)
     libraryByStore,
     statusBreakdown: games.length ? breakdown(games, (g) => g.status, (k) => STATUS_COLOR[k]) : null,
     reviewSentiment,

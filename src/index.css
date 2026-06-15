@@ -185,8 +185,18 @@ b { font-weight: 700; color: var(--text); }
   backdrop-filter: blur(8px);
 }
 .trending-card .eyebrow { color: var(--accent); }
-.trending-card h2 { font-size: 24px; font-weight: 800; margin: 4px 0; }
-.trending-meta { font-size: 13px; color: var(--muted); }
+.trending-card h2 { font-size: 22px; font-weight: 800; margin: 4px 0; max-width: 260px; }
+.trending-art {
+  display: block; width: 240px; max-width: 100%;
+  aspect-ratio: 460 / 215; object-fit: cover;
+  border-radius: 9px; margin: 8px 0 10px auto;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+}
+.trending-meta {
+  font-size: 13px; color: var(--muted);
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+}
+.trend-disc { color: #4ade80; }
 
 /* ---------- Quick strip (scrolling marquee) ---------- */
 .quick-strip {

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { storeMeta, type Game, type GameStatus, type StoreKey } from '../data/mockData'
 import { useData } from '../data/DataContext'
+import { allTags, tagKey, useTagMap } from '../data/tags'
 import GameModal from './GameModal'
 
 const STATUS_TONE: Record<GameStatus, string> = {
@@ -20,18 +21,22 @@ function toggled<T>(set: Set<T>, v: T): Set<T> {
 
 export default function Library() {
   const { library, setGameStatus } = useData()
+  const tagMap = useTagMap()
+  const tags = useMemo(() => allTags(tagMap), [tagMap])
   // Multi-select filters: empty set = no filter (show all). Selected stores OR
-  // together, selected statuses OR together, the two groups AND together.
+  // together, statuses OR together, tags OR together; the groups AND together.
   const [storeSel, setStoreSel] = useState<Set<StoreKey>>(new Set())
   const [statusSel, setStatusSel] = useState<Set<GameStatus>>(new Set())
+  const [tagSel, setTagSel] = useState<Set<string>>(new Set())
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState<Game | null>(null)
 
   const games = useMemo(() => library.filter((g) =>
     (storeSel.size === 0 || storeSel.has(g.store)) &&
     (statusSel.size === 0 || statusSel.has(g.status)) &&
+    (tagSel.size === 0 || (tagMap[tagKey(g)] ?? []).some((t) => tagSel.has(t))) &&
     g.name.toLowerCase().includes(q.toLowerCase())
-  ), [library, storeSel, statusSel, q])
+  ), [library, storeSel, statusSel, tagSel, tagMap, q])
 
   return (
     <div className="page">
@@ -59,6 +64,16 @@ export default function Library() {
               onClick={() => setStatusSel(toggled(statusSel, s))}>{s}</button>
           ))}
         </div>
+        {tags.length > 0 && (
+          <div className="filter-group">
+            <span className="filter-label">Tags</span>
+            <button className={`chip ${tagSel.size === 0 ? 'on' : ''}`} onClick={() => setTagSel(new Set())}>All</button>
+            {tags.map((t) => (
+              <button key={t} className={`chip tag ${tagSel.has(t) ? 'on' : ''}`}
+                onClick={() => setTagSel(toggled(tagSel, t))}>{t}</button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="game-grid">

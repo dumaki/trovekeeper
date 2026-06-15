@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Dashboard from './components/Dashboard'
 import Library from './components/Library'
 import Wishlist from './components/Wishlist'
 import ChestIcon from './components/ChestIcon'
 import { useData } from './data/DataContext'
+import { THEMES, setTheme, useTheme } from './data/theme'
 
 type Tab = 'dashboard' | 'library' | 'wishlist'
 
@@ -58,7 +59,10 @@ export default function App() {
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-mark"><ChestIcon size={22} /></span>
-          <span className="brand-name">TroveKeeper</span>
+          <span className="brand-text">
+            <span className="brand-name">TroveKeeper</span>
+            <span className="brand-tagline">Every library. One trove.</span>
+          </span>
         </div>
         <nav className="nav">
           {TABS.map((t) => (
@@ -70,6 +74,7 @@ export default function App() {
           ))}
         </nav>
         <div className="sidebar-footer">
+          <ThemeSwitcher />
           {showBadge && (
             <div className={`source-badge ${badge.cls}`}>
               <span className="source-dot" />
@@ -96,6 +101,45 @@ export default function App() {
         {tab === 'library' && <Library />}
         {tab === 'wishlist' && <Wishlist />}
       </main>
+    </div>
+  )
+}
+
+// Compact theme picker pinned in the sidebar footer. Click to expand a popover
+// of color presets; selection applies instantly and persists.
+function ThemeSwitcher() {
+  const active = useTheme()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const cur = THEMES.find((t) => t.id === active) ?? THEMES[0]
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    window.addEventListener('mousedown', onDown)
+    return () => window.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  return (
+    <div className="theme-switch" ref={ref}>
+      {open && (
+        <div className="theme-menu" role="listbox">
+          {THEMES.map((t) => (
+            <button key={t.id} role="option" aria-selected={t.id === active}
+              className={`theme-option ${t.id === active ? 'on' : ''}`}
+              onClick={() => { setTheme(t.id); setOpen(false) }}>
+              <span className="theme-swatch" style={{ background: t.swatch }} />
+              {t.label}
+              {t.id === active && <span className="theme-check">✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
+      <button className="theme-trigger" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <span className="theme-swatch" style={{ background: cur.swatch }} />
+        <span className="theme-trigger-label">{cur.label}</span>
+        <span className="theme-caret">▾</span>
+      </button>
     </div>
   )
 }

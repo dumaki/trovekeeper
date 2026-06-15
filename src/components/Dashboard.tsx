@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { storeMeta, type GameStatus, type StoreKey } from '../data/mockData'
+import { storeMeta, type Game, type GameStatus, type StoreKey } from '../data/mockData'
 import { storeIconPaths } from '../data/storeIcons'
 import { useData } from '../data/DataContext'
 import Donut from './Donut'
@@ -60,6 +60,22 @@ export default function Dashboard() {
   const avgCompletion = withAch.length
     ? Math.round((withAch.reduce((s, g) => s + g.achUnlocked! / g.achTotal!, 0) / withAch.length) * 100)
     : 0
+
+  // ---- extra dashboard panels (all derived from the live library) ----
+  const mostPlayed = [...library]
+    .filter((g) => g.playtimeHours > 0)
+    .sort((a, b) => b.playtimeHours - a.playtimeHours)
+    .slice(0, 5)
+  const recentlyPlayed = [...library]
+    .filter((g) => (g.lastPlayed ?? 0) > 0)
+    .sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))
+    .slice(0, 5)
+  // Closest to a perfect run: has achievements, not yet 100%, highest ratio first.
+  const closestToComplete = withAch
+    .filter((g) => g.achUnlocked! < g.achTotal!)
+    .map((g) => ({ g, pct: Math.round((g.achUnlocked! / g.achTotal!) * 100) }))
+    .sort((a, b) => b.pct - a.pct)
+    .slice(0, 5)
 
   // Rotating facts shown below the hero — each value is live/computed.
   const facts: ReactNode[] = [
@@ -226,6 +242,66 @@ export default function Dashboard() {
             : 'Review data not fetched yet'}
         />
       </section>
+
+      {/* ---- INSIGHT PANELS ---- */}
+      <section className="panel-grid">
+        <GameList title="Most Played" games={mostPlayed}
+          metric={(g) => `${g.playtimeHours.toLocaleString()}h`}
+          empty="No playtime recorded yet." />
+        <GameList title="Recently Played" games={recentlyPlayed}
+          metric={(g) => relTime(g.lastPlayed)}
+          empty="No recent activity." />
+        <GameList title="Closest to 100%" games={closestToComplete.map((c) => c.g)}
+          metric={(g) => `${Math.round((g.achUnlocked! / g.achTotal!) * 100)}%`}
+          bar={(g) => Math.round((g.achUnlocked! / g.achTotal!) * 100)}
+          empty="No achievements tracked yet." />
+      </section>
+    </div>
+  )
+}
+
+// Relative "x ago" for last-played timestamps (unix seconds).
+function relTime(unix?: number): string {
+  if (!unix) return '—'
+  const days = Math.floor((Date.now() / 1000 - unix) / 86400)
+  if (days <= 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days < 30) return `${days}d ago`
+  if (days < 365) return `${Math.floor(days / 30)}mo ago`
+  return `${Math.floor(days / 365)}y ago`
+}
+
+// A small ranked list of games with a cover thumbnail + a metric (and optional
+// progress bar). Used for the dashboard insight panels.
+function GameList({ title, games, metric, bar, empty }: {
+  title: string
+  games: Game[]
+  metric: (g: Game) => string
+  bar?: (g: Game) => number
+  empty: string
+}) {
+  return (
+    <div className="panel">
+      <h3 className="panel-title">{title}</h3>
+      {games.length === 0 ? (
+        <p className="panel-empty">{empty}</p>
+      ) : (
+        <ol className="panel-list">
+          {games.map((g) => (
+            <li key={`${g.store}-${g.storeId ?? g.appid}`} className="panel-row">
+              <img className="panel-thumb" src={g.headerImage} alt="" loading="lazy"
+                onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} />
+              <div className="panel-info">
+                <span className="panel-name" title={g.name}>{g.name}</span>
+                {bar && (
+                  <span className="panel-bar"><span className="panel-bar-fill" style={{ width: `${bar(g)}%` }} /></span>
+                )}
+              </div>
+              <span className="panel-metric">{metric(g)}</span>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   )
 }

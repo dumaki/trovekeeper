@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Game } from '../data/mockData'
+import { addTag, removeTag, tagKey, useTagMap } from '../data/tags'
 
 interface AchievementDetail {
   apiname: string
@@ -63,6 +64,16 @@ export default function GameModal({ game, onClose }: { game: Game; onClose: () =
 
   const tags = [...(detail?.genres ?? []), ...(detail?.categories ?? [])]
 
+  // ---- user-assigned custom tags (persisted, filterable in the Library) ----
+  const tagMap = useTagMap()
+  const key = tagKey(game)
+  const myTags = tagMap[key] ?? []
+  const [draft, setDraft] = useState('')
+  function commitTag() {
+    addTag(key, draft)
+    setDraft('')
+  }
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -85,6 +96,22 @@ export default function GameModal({ game, onClose }: { game: Game; onClose: () =
               {tags.map((t) => <span key={t} className="tag-chip">{t}</span>)}
             </div>
           )}
+
+          <div className="modal-mytags">
+            <h3>Your Tags</h3>
+            <div className="mytag-row">
+              {myTags.map((t) => (
+                <span key={t} className="tag-chip mine">
+                  {t}
+                  <button className="tag-remove" aria-label={`Remove ${t}`}
+                    onClick={() => removeTag(key, t)}>×</button>
+                </span>
+              ))}
+              <input className="tag-input" placeholder="Add tag…" value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') commitTag() }} />
+            </div>
+          </div>
 
           {detail?.shortDescription && <p className="modal-desc">{detail.shortDescription}</p>}
 

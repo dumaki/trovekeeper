@@ -9,17 +9,16 @@ tabs: **Dashboard**, **Library**, **Wishlist** (Wishlist has per-store sub-tabs)
 
 - **Repo:** https://github.com/dumaki/trovekeeper  (`main` is current & green)
 - **Local path:** `/Users/benhughes/Documents/Claude/TroveKeeper`
-- **Eight stores connected & live-verified** in the owner's `.env`: **Steam**
-  (~1,112 games), **GOG**, **Epic**, **PSN**, **Xbox**, **Nintendo** (eShop),
-  **itch.io**, **Ubisoft** (Connect) — plus **IGDB** for time-to-beat. Each
-  non-Steam store is its own provider merged into the library, dashboard donut,
-  and the quick-strip marquee chips. Store chips render real **brand logos**
-  (`src/data/storeIcons.ts`).
-- **Store target is 9** (`storesTotal`): the 8 above + 1 remaining — **Amazon**
-  (next). **EA, Humble Bundle, and Battle.net were dropped from the target** — EA
-  removed its in-browser library (desktop-app only); Humble keys are already
-  redeemed on Steam; Battle.net has no owned-games API. (The EA recipe is kept in
-  the follow-ups in case it's ever revisited.)
+- **Nine stores connected & live-verified** in the owner's `.env` (the full
+  target): **Steam** (~1,112 games), **GOG**, **Epic**, **PSN**, **Xbox**,
+  **Nintendo** (eShop), **itch.io**, **Ubisoft** (Connect), **Amazon** (Prime
+  Gaming) — plus **IGDB** for time-to-beat. Each non-Steam store is its own
+  provider merged into the library, dashboard donut, and the quick-strip marquee
+  chips. Store chips render real **brand logos** (`src/data/storeIcons.ts`).
+- **Store target reached: 9/9** (`storesTotal`). **EA, Humble Bundle, and
+  Battle.net were dropped from the target** — EA removed its in-browser library
+  (desktop-app only); Humble keys are already redeemed on Steam; Battle.net has no
+  owned-games API. (The EA recipe is kept in the follow-ups in case it's revisited.)
 
 ## Run / verify
 ```bash
@@ -36,6 +35,7 @@ npm run xbox-login # one-time Xbox: Microsoft OAuth -> XBOX_REFRESH_TOKEN in .en
 npm run nintendo-login # paste ec.nintendo.com session cookie (~30d) -> NINTENDO_COOKIE
 npm run itch-login # paste itch.io API key -> ITCH_API_KEY (verified against /profile)
 npm run ubisoft-login # paste ubisoft.com rememberMeTicket -> UBISOFT_REMEMBER_TOKEN
+npm run amazon-login # Login-with-Amazon device flow -> AMAZON_REFRESH_TOKEN + AMAZON_SERIAL
 ```
 Owner usually runs their **own** `npm run dev` in a terminal. The Claude preview
 tool can't attach to it (it owns :5173/:8787), so to screenshot you must
@@ -97,8 +97,8 @@ when you don't need a visual.
   the count; the 1130→1112 drop was ads/mods/DLC/demos/betas).
 
 ## Features built (all on `main`)
-**Eight-store library** (Steam/GOG/Epic/PSN/Xbox/Nintendo/itch.io/Ubisoft merged) ·
-**real brand-logo store chips** · editable per-game
+**Nine-store library** (Steam/GOG/Epic/PSN/Xbox/Nintendo/itch.io/Ubisoft/Amazon
+merged) · **real brand-logo store chips** · editable per-game
 **status** (dropdown on cards, persisted, played→Playing default) · **dashboard
 stats** computed from real data (deals-live, %complete, backlog hours, status
 donut, review-sentiment donut, **library-by-store donut**) · **scrolling
@@ -130,6 +130,8 @@ mock flash · server type-checking.
 - `server/providers/itch.ts` — itch.io API-key owned-keys library. Merged into steam.ts.
 - `server/providers/ubisoft.ts` — rememberMeTicket→ticket refresh; gamesplayed +
   catalog + stats(playtime). Merged into steam.ts.
+- `server/providers/amazon.ts` — device-OAuth refresh token + serial; Amazon Games
+  entitlements library. Merged into steam.ts.
 - `server/providers/igdb.ts` — Twitch auth + batched time-to-beat.
 - `src/data/storeIcons.ts` — brand-logo SVG paths (simple-icons) for the store chips.
 - `src/components/Dashboard.tsx` — all dashboard math (computes from library +
@@ -242,12 +244,19 @@ Hard-won conventions:
   `stats?statNames=Playtime` (seconds→hours, queried per *played* spaceId).
   Playtime is sparse (Ubisoft only records it for some titles); last-played is
   universal. No achievements on this surface. spaceId hashed into appid (2.9B).
+- **Amazon** ✅ library (`amazon-login`). Auth = the Amazon Games launcher's
+  Login-with-Amazon **device flow** (like Nile/Heroic): a one-time browser OAuth
+  registers a device → long-lived `AMAZON_REFRESH_TOKEN` + `AMAZON_SERIAL` (serial
+  feeds the library `hardwareHash = SHA256(serial)`). Server refreshes bearer
+  tokens via `POST api.amazon.com/auth/token`; library =
+  `POST gaming.amazon.com/api/distribution/entitlements` (X-Amz-Target
+  `…AnimusEntitlementsService.GetEntitlements`, paged by nextToken). Each
+  entitlement's `product.productDetail.details` gives title + landscape art
+  (`backgroundUrl1`, NOT a box/key art) + developer/publisher/genres/gameModes/
+  release/description. No playtime/achievements. product.id hashed into appid (3.1B).
 
 ## Open follow-ups / next up
-1. **Amazon (next store)** — Login-with-Amazon device OAuth like Nile/Heroic;
-   owned + art only (sparse). DevTools/proxy-capturable. Needs a claimed Prime
-   Gaming game to test against.
-2. **EA — DROPPED from the target** (recipe kept for reference). EA removed the
+1. **EA — DROPPED from the target** (recipe kept for reference). EA removed the
    web games list (April 2025 Origin sunset);
    the library is now only in the desktop EA app, so there's nothing to capture
    in-browser. The API would be *rich* (owned + playtime + achievements) and the
@@ -264,7 +273,7 @@ Hard-won conventions:
    server-side (post-Origin it may be dead); (b) reliable but heavy — proxy-
    capture the desktop EA app (Proxyman/mitmproxy + cert, possible pinning).
    Owner has only ~2 EA games, so low value — deprioritised.
-3. **Humble + Battle.net dropped** (Humble keys all redeemed on Steam; Battle.net
+2. **Humble + Battle.net dropped** (Humble keys all redeemed on Steam; Battle.net
    has no owned-games API). Optional Ubisoft follow-up: **achievements/Units**
    (a separate club endpoint, not yet wired).
 3. **Nintendo wishlist** — dormant; needs a nintendo.com wishlist XHR capture

@@ -96,9 +96,18 @@ export default function Dashboard() {
   ]
 
   const [t, setT] = useState(0)
+  const [playing, setPlaying] = useState(true)
   const cur = trending[t % trending.length]
   const cycle = (dir: number) =>
     setT((p) => (p + dir + trending.length) % trending.length)
+
+  // Auto-advance the trending carousel while playing. `t` is in the deps so the
+  // countdown also restarts after a manual ‹/› nav.
+  useEffect(() => {
+    if (!playing || trending.length <= 1) return
+    const id = setInterval(() => setT((p) => (p + 1) % trending.length), 6000)
+    return () => clearInterval(id)
+  }, [playing, trending.length, t])
 
   return (
     <div className="dashboard">
@@ -151,7 +160,9 @@ export default function Dashboard() {
 
         <div className="carousel-ctl">
           <button onClick={() => cycle(-1)} aria-label="Previous">‹</button>
-          <button aria-label="Pause">❚❚</button>
+          <button onClick={() => setPlaying((p) => !p)} aria-label={playing ? 'Pause' : 'Play'}>
+            {playing ? '❚❚' : '▶'}
+          </button>
           <button onClick={() => cycle(1)} aria-label="Next">›</button>
         </div>
         <div className="trending-card">

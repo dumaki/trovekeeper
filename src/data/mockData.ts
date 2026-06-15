@@ -65,9 +65,9 @@ export const profile = {
 // Trending hero rotation (the "TRENDING NOW" card). Live data = Steam top
 // sellers (name + box art + price/discount); this is the offline/mock fallback.
 export const trending = [
-  { name: "Baldur's Gate 3", store: 'Steam' as StoreKey, headerImage: hdr(1086940), price: 59.99, origPrice: 59.99, discountPct: 0 },
-  { name: 'Elden Ring',       store: 'Steam' as StoreKey, headerImage: hdr(1245620), price: 41.99, origPrice: 59.99, discountPct: 30 },
-  { name: 'Cyberpunk 2077',   store: 'Steam' as StoreKey, headerImage: hdr(1091500), price: 29.99, origPrice: 59.99, discountPct: 50 },
+  { name: "Baldur's Gate 3", store: 'Steam' as StoreKey, appid: 1086940, headerImage: hdr(1086940), price: 59.99, origPrice: 59.99, discountPct: 0,  reviewPct: 96, reviewDesc: 'Overwhelmingly Positive' },
+  { name: 'Elden Ring',       store: 'Steam' as StoreKey, appid: 1245620, headerImage: hdr(1245620), price: 41.99, origPrice: 59.99, discountPct: 30, reviewPct: 93, reviewDesc: 'Very Positive' },
+  { name: 'Cyberpunk 2077',   store: 'Steam' as StoreKey, appid: 1091500, headerImage: hdr(1091500), price: 29.99, origPrice: 59.99, discountPct: 50, reviewPct: 81, reviewDesc: 'Very Positive' },
 ]
 
 // ---- Aggregate breakdowns (the three donut charts) -----------------------

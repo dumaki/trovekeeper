@@ -110,6 +110,7 @@ b { font-weight: 700; color: var(--text); }
 }
 .hero-art { position: absolute; inset: 0; }
 .hero-scene { width: 100%; height: 100%; display: block; }
+.hero-cover { width: 100%; height: 100%; object-fit: cover; object-position: center 25%; display: block; }
 .hero-fade {
   position: absolute; inset: 0;
   background:
@@ -185,17 +186,13 @@ b { font-weight: 700; color: var(--text); }
   backdrop-filter: blur(8px);
 }
 .trending-card .eyebrow { color: var(--accent); }
-.trending-card h2 { font-size: 22px; font-weight: 800; margin: 4px 0; max-width: 260px; }
-.trending-art {
-  display: block; width: 240px; max-width: 100%;
-  aspect-ratio: 460 / 215; object-fit: cover;
-  border-radius: 9px; margin: 8px 0 10px auto;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.45);
-}
+.trending-card h2 { font-size: 24px; font-weight: 800; margin: 4px 0; max-width: 280px; }
 .trending-meta {
   font-size: 13px; color: var(--muted);
-  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap;
 }
+.trend-review { color: #cdd6e4; }
+.trending-price { font-size: 14px; color: var(--muted); margin-top: 3px; font-weight: 600; }
 .trend-disc { color: #4ade80; }
 
 /* ---------- Quick strip (scrolling marquee) ---------- */

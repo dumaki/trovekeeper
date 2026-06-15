@@ -394,13 +394,22 @@ async function fetchTrending(): Promise<typeof mock.trending> {
     out.push({
       name: it.name ?? `App ${id}`,
       store: 'Steam' as StoreKey,
+      appid: id,
       headerImage: it.header_image || it.large_capsule_image || '',
       price: (it.final_price ?? 0) / 100,
       origPrice: (it.original_price ?? it.final_price ?? 0) / 100,
       discountPct: it.discount_percent ?? 0,
+      reviewPct: 0,
+      reviewDesc: '',
     })
     if (out.length >= 12) break
   }
+  // Sentiment: featuredcategories carries no review data, so pull each game's
+  // review summary (Steam's descriptor + positive %). Best-effort, in parallel.
+  await Promise.all(out.map(async (t) => {
+    const r = await reviewSummary(t.appid).catch(() => null)
+    if (r && r.desc && r.desc !== 'No user reviews') { t.reviewPct = r.pct; t.reviewDesc = r.desc }
+  }))
   return out
 }
 

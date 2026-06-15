@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { storeMeta, type GameStatus, type StoreKey } from '../data/mockData'
 import { storeIconPaths } from '../data/storeIcons'
 import { useData } from '../data/DataContext'
-import HeroScene from './HeroScene'
 import Donut from './Donut'
 
 const heroStores = Object.keys(storeMeta) as (keyof typeof storeMeta)[]
@@ -106,7 +105,12 @@ export default function Dashboard() {
       {/* ---- HERO ---- */}
       <section className="hero">
         <div className="hero-art">
-          <HeroScene />
+          {/* The current trending game's cover art fills the hero; library_hero is
+              the wide cinematic art, falling back to the header capsule. */}
+          <img className="hero-cover" key={cur.appid}
+            src={`https://cdn.cloudflare.steamstatic.com/steam/apps/${cur.appid}/library_hero.jpg`}
+            alt={cur.name}
+            onError={(e) => { const i = e.currentTarget; if (!i.dataset.fb) { i.dataset.fb = '1'; i.src = cur.headerImage } }} />
           <div className="hero-fade" />
         </div>
 
@@ -152,13 +156,12 @@ export default function Dashboard() {
         </div>
         <div className="trending-card">
           <p className="eyebrow">Trending Now</p>
-          {cur.headerImage && (
-            <img className="trending-art" src={cur.headerImage} alt={cur.name} loading="lazy"
-              onError={(e) => { e.currentTarget.style.display = 'none' }} />
-          )}
           <h2>{cur.name}</h2>
           <p className="trending-meta">
             <span className="store-tag" style={{ background: storeMeta[cur.store].color }}>{storeMeta[cur.store].label}</span>
+            {cur.reviewDesc && <span className="trend-review">{cur.reviewDesc}{cur.reviewPct ? ` · ${cur.reviewPct}%` : ''}</span>}
+          </p>
+          <p className="trending-price">
             {cur.discountPct > 0 && <b className="trend-disc">−{cur.discountPct}%</b>}
             {' '}{cur.price > 0 ? `$${cur.price.toFixed(2)}` : 'Free'}
           </p>

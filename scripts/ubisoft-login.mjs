@@ -36,6 +36,12 @@ const c = {
   bold: (s) => `\x1b[1m${s}\x1b[0m`,
 }
 
+// Console one-liner the user pastes into DevTools on ubisoft.com to copy their
+// rememberMeTicket to the clipboard. Printed by the prompt below (not just left
+// in a comment) so first-time setup is copy-paste, no source-diving.
+const COPY_TICKET_SNIPPET =
+  `copy((Object.values(localStorage).map(v=>{try{return JSON.parse(v)}catch{return 0}}).find(o=>o&&o.rememberMeTicket)||{}).rememberMeTicket||'NOT FOUND')`
+
 const exists = (p) => access(p, constants.F_OK).then(() => true, () => false)
 
 function prompt(question) {
@@ -62,8 +68,12 @@ function setEnvValue(body, key, value) {
 async function main() {
   console.log(c.bold('\n  TroveKeeper — Ubisoft Connect login\n'))
   console.log('  1. Sign in at ' + c.cyan('https://www.ubisoft.com') + c.dim('  (tick "stay signed in")'))
-  console.log(c.dim('  2. DevTools (F12) > Console, paste the one-liner from this script\'s'))
-  console.log(c.dim('     comment to copy your rememberMeTicket, then paste it below.\n'))
+  console.log('  2. Open DevTools ' + c.dim('(F12)') + ' > Console, paste this, then hit Enter')
+  console.log(c.dim('     (copies your rememberMeTicket to the clipboard):\n'))
+  console.log('     ' + c.cyan(COPY_TICKET_SNIPPET) + '\n')
+  console.log(c.dim('     If it copies "NOT FOUND", open the Network tab, find the POST to'))
+  console.log(c.dim('     public-ubiservices.ubi.com/v3/profiles/sessions, and paste that whole'))
+  console.log(c.dim('     JSON response below instead.\n'))
 
   const rm = extractTicket(await prompt('  3. Paste rememberMeTicket (or the sessions JSON):\n  > '))
   if (!rm) {

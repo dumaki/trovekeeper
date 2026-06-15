@@ -97,6 +97,11 @@ when you don't need a visual.
   the count; the 1130→1112 drop was ads/mods/DLC/demos/betas).
 
 ## Features built (all on `main`)
+> **Feature-complete as of 2026-06-15.** The owner signed off the closeout set
+> (sidebar tagline, custom tags + filter, dashboard insight panels, theme
+> switcher) — see the last four items below. Remaining entries in "Open
+> follow-ups" are explicitly deprioritised / optional, not blockers.
+
 **Nine-store library** (Steam/GOG/Epic/PSN/Xbox/Nintendo/itch.io/Ubisoft/Amazon
 merged) · **real brand-logo store chips** · editable per-game
 **status** (dropdown on cards, persisted, played→Playing default) · **dashboard
@@ -110,7 +115,17 @@ library facts** below the hero (fade every 10s, incl. skipped-games count) ·
 **non-game filtering** (Steam type + name) · **game detail modal** (info +
 scrollable locked/unlocked achievements/trophies) · **Wishlist with per-store
 tabs** (Steam/GOG/Epic/Nintendo, each shown only when it has items) · loader instead of
-mock flash · server type-checking.
+mock flash · server type-checking · **sidebar tagline** ("Every library. One
+trove.") · **custom tags** (free-form, per-game, persisted to localStorage keyed
+like statuses so they span all 9 stores; assigned in the detail modal, surfaced
+as a Tags filter row in the Library — chosen over auto genres since those only
+exist for Steam and aren't cached; see `src/data/tags.ts`) · **dashboard insight
+panels** (Most Played / Recently Played / Closest to 100%, computed live) ·
+**profile card** (large avatar from the Steam profile pic, falling back to a
+user-uploaded image then the persona initial) · **"Live Steam data" pill** shown
+only when Steam is the sole store · **theme switcher** (Midnight Blue default +
+Ember/Forest/Synthwave; presets override CSS vars via `<html data-theme>`,
+persisted, applied before first paint; see `src/data/theme.ts`).
 
 ## Key files
 - `server/providers/steam.ts` — the big one: owned games, all caches, the 3-loop

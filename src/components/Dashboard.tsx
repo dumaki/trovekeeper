@@ -21,7 +21,7 @@ const ASSUMED_HOURS_PER_GAME = 8
 const TTB_CAP_HOURS = 200
 
 export default function Dashboard() {
-  const { dashboard, library, wishlist } = useData()
+  const { dashboard, library, wishlist, gogWishlist, epicWishlist, nintendoWishlist } = useData()
   const { profile, trending, libraryByStore, reviewSentiment } = dashboard
 
   // ---- everything status/deal-derived is computed from real data, so it
@@ -32,7 +32,9 @@ export default function Dashboard() {
   const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0)
 
   const completePct = pct(counts.Finished)
-  const dealsLive = wishlist.filter((w) => w.discountPct > 0).length
+  // Deals live = on-sale items across every wishlist (Steam + GOG + Epic + …).
+  const dealsLive = [wishlist, gogWishlist, epicWishlist, nintendoWishlist]
+    .reduce((n, list) => n + list.filter((w) => w.discountPct > 0).length, 0)
   const backlogGames = counts.Backlog + counts.Next
   const gogGames = library.filter((g) => g.store === 'GOG').length
   const epicGames = library.filter((g) => g.store === 'Epic').length
